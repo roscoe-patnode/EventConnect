@@ -6,11 +6,12 @@
     let loading = false;
     let firstName = '';
     let lastName = '';
-    let email = '';
+    let email = $state('');
     let password = '';
-    let accountType = 'personal'; // Default value
-    let errorMessage = '';
+    let accountType = 'personal'; // Default supabase value
+    let errorMessage = $state('');
     let rememberMe = $state(false);
+    let resendMessage = $state('');
     
     async function handleSignup() {
         try {
@@ -78,6 +79,12 @@
     
             if (error) throw error;
 
+            // Check if email is verified
+            if (!data.user?.email_confirmed_at) {
+                errorMessage = 'Please verify your email before signing in. Check your inbox for the verification link.';
+                return;
+            }
+
             // If remember me is checked, store the session
             if (rememberMe) {
                 const { error: sessionError } = await supabase.auth.setSession({
@@ -116,6 +123,20 @@
             loading = false;
         }
     }
+
+    async function handleResend() {
+        try {
+            const { error } = await supabase.auth.resend({ 
+                type: 'signup', 
+                email 
+            });
+            if (error) throw error;
+                resendMessage = 'Verification email sent! Please check your inbox.';
+        } catch (error) {
+            resendMessage = 'Failed to send verification email. Please try again.';
+        }
+    }
+
 </script>
 
 {#if pageState === "SignUp"}
@@ -247,6 +268,22 @@
         <p class="text-gray-600">Log in to access your account</p>
         </div>
         
+        {#if errorMessage.length > 0}
+            <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+                <p class="text-red-700">{errorMessage}</p>
+                <button 
+                    class="text-indigo-600 hover:underline mt-2 text-sm"
+                    onclick={handleResend}
+                >
+                    Resend verification email
+                </button>
+                {#if resendMessage.length > 0}
+                    <p class="text-sm text-green-600 mt-1">{resendMessage}</p>
+                {/if}
+            </div>
+        {/if}
+        <!-- 276 onclick() onclick={() => supabase.auth.resend({ type: 'signup', email })} -->
+
         <form class="space-y-6" onsubmit={handleSignIn}>
         <!-- Email -->
         <div>
@@ -312,5 +349,4 @@
         </div>
         </form>
     </div>
-
 {/if}

@@ -48,8 +48,7 @@
     // Navigation items based on role
     const navItems:any = {
         event_planner: [
-            { href: "/dashboard/planner", label: "My Events" },
-            { href: "/dashboard/planner/bookings", label: "Book Facility" },
+            { href: "/dashboard/planner/events", label: "My Events" },
             { href: "/dashboard/planner/calendar", label: "Calendar" }
         ],
         facility_owner: [
