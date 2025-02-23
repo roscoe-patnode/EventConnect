@@ -330,7 +330,6 @@
         </div>
         
         <!-- Login button -->
-        <!-- DB Name: ConnectApp; Pswd: ConnectApp.Supa11 -->
         <div>
             <button 
             type="submit" 
