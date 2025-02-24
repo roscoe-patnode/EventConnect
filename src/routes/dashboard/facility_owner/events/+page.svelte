@@ -16,6 +16,7 @@
     let salesContact = '';
     let salesEmail = '';
     let venueWebsite = '';
+    let eventDate = '';
 
     async function fetchEvents() {
         try {
@@ -62,7 +63,8 @@
                         venue_phone: venuePhone,
                         sales_contact: salesContact,
                         sales_email: salesEmail,
-                        venue_website: venueWebsite
+                        venue_website: venueWebsite,
+                        event_date: eventDate
                     }
                 ])
                 .select();
@@ -86,6 +88,7 @@
         salesContact = '';
         salesEmail = '';
         venueWebsite = '';
+        eventDate = '';
         showCreateForm = false;
     }
 
@@ -137,7 +140,8 @@
                     venue_phone: currentEvent.venue_phone,
                     sales_contact: currentEvent.sales_contact,
                     sales_email: currentEvent.sales_email,
-                    venue_website: currentEvent.venue_website
+                    venue_website: currentEvent.venue_website,
+                    event_date: currentEvent.event_date
                 })
                 .eq('id', currentEvent.id);
 
@@ -193,6 +197,17 @@
                             type="text"
                             id="eventName"
                             bind:value={eventName}
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label for="eventDate" class="block text-sm font-medium text-gray-700">Event Date</label>
+                        <input
+                            type="date"
+                            id="eventDate"
+                            bind:value={eventDate}
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             required
                         />
@@ -308,6 +323,17 @@
                             type="text"
                             id="editEventName"
                             bind:value={currentEvent.event_name}
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label for="editEventDate" class="block text-sm font-medium text-gray-700">Event Date</label>
+                        <input
+                            type="date"
+                            id="editEventDate"
+                            bind:value={currentEvent.event_date}
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             required
                         />
@@ -458,10 +484,12 @@
                                     </button>
                                 </div>
                         </div>
+                        <!-- Event Cards -->
                         <div class="space-y-2 text-sm text-gray-600">
+                            <p><span class="font-medium">Date:</span> {new Date(event.event_date).toLocaleDateString()}</p>
                             <p><span class="font-medium">Venue:</span> {event.venue_name}</p>
                             <p><span class="font-medium">Address:</span> {event.venue_address}</p>
-                            <p><span class="font-medium">Contact:</span> {event.sales_ontact}</p>
+                            <p><span class="font-medium">Contact:</span> {event.sales_contact}</p>
                             <p><span class="font-medium">Email:</span> {event.sales_email}</p>
                             <p>
                                 <a href={event.venue_website} target="_blank" rel="noopener noreferrer" 
