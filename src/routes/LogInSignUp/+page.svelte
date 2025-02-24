@@ -109,7 +109,7 @@
             if (role === 'event_planner') {
                 goto('/dashboard/planner');
             } else if (role === 'facility_owner') {
-                goto('/dashboard/owner');
+                goto('/dashboard/facility_owner');
             } else if (role === 'staff_member') {
                 goto('/dashboard/staff');
             } else {
@@ -143,33 +143,33 @@
   
     <div class="max-w-5xl mx-auto bg-white p-8 rounded-lg shadow-md my-8">
         <div class="mb-6">
-        <h2 class="text-2xl font-semibold text-gray-800 mb-2">Create Account</h2>
-        <p class="text-gray-600">Join us today to access exclusive features</p>
+            <h2 class="text-2xl font-semibold text-gray-800 mb-2">Create Account</h2>
+            <p class="text-gray-600">Join us today to access exclusive features</p>
         </div>
         
         {#if errorMessage}
-        <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
-            <p class="text-red-700">{errorMessage}</p>
-        </div>
+            <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+                <p class="text-red-700">{errorMessage}</p>
+            </div>
         {/if}
         
         <!-- Account Type Selection -->
         <div class="mb-6">
         <label class="block text-gray-700 font-medium mb-3">Account Type</label>
-        <div class="flex space-x-6">
-            <label class="flex items-center">
-            <input type="radio" bind:group={accountType} name="accountType" value="event_planner" class="h-5 w-5 text-indigo-600" checked>
-            <span class="ml-2 text-gray-700">Event Planner</span>
-            </label>
-            <label class="flex items-center">
-            <input type="radio" bind:group={accountType} name="accountType" value="facility_owner" class="h-5 w-5 text-indigo-600">
-            <span class="ml-2 text-gray-700">Facility Owner</span>
-            </label>
-            <label class="flex items-center">
-            <input type="radio" bind:group={accountType} name="accountType" value="staff_member" class="h-5 w-5 text-indigo-600">
-            <span class="ml-2 text-gray-700">Staff member</span>
-            </label>
-        </div>
+            <div class="flex space-x-6">
+                <label class="flex items-center">
+                <input type="radio" bind:group={accountType} name="accountType" value="event_planner" class="h-5 w-5 text-indigo-600" checked>
+                <span class="ml-2 text-gray-700">Event Planner</span>
+                </label>
+                <label class="flex items-center">
+                <input type="radio" bind:group={accountType} name="accountType" value="facility_owner" class="h-5 w-5 text-indigo-600">
+                <span class="ml-2 text-gray-700">Facility Owner</span>
+                </label>
+                <label class="flex items-center">
+                <input type="radio" bind:group={accountType} name="accountType" value="staff_member" class="h-5 w-5 text-indigo-600">
+                <span class="ml-2 text-gray-700">Staff member</span>
+                </label>
+            </div>
         </div>
         
         <form class="space-y-6" onsubmit={handleSignup}>
@@ -282,7 +282,6 @@
                 {/if}
             </div>
         {/if}
-        <!-- 276 onclick() onclick={() => supabase.auth.resend({ type: 'signup', email })} -->
 
         <form class="space-y-6" onsubmit={handleSignIn}>
         <!-- Email -->

@@ -52,9 +52,8 @@
             { href: "/dashboard/planner/calendar", label: "Calendar" }
         ],
         facility_owner: [
-            { href: "/dashboard/owner/facilities", label: "My Facilities" },
-            { href: "/dashboard/owner/bookings", label: "Bookings" },
-            { href: "/dashboard/owner/analytics", label: "Analytics" }
+            { href: "/dashboard/facility_owner/events", label: "My Events" },
+            { href: "/dashboard/facility_owner/calendar", label: "Calendar" },
         ],
         staff_member: [
             { href: "/dashboard/staff/tasks", label: "Tasks" },
@@ -65,6 +64,7 @@
 
 </script>
 
+<!-- might have to change staff user role in #if -->
 <div class="min-h-screen flex flex-col">
     <nav class="w-full transition-all duration-300 bg-white shadow-sm">
         <div class="max-w-7xl mx-auto px-8">

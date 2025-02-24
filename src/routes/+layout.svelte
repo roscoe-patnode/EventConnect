@@ -28,7 +28,7 @@
 		  <!-- Logo -->
 		  <div class="flex-shrink-0">
 			<a href="/" class="flex items-center">
-			  <span class="text-xl font-bold text-indigo-600">YourLogo</span>
+			  <span class="text-xl font-bold text-indigo-600">Logo</span>
 			</a>
 		  </div>
 		  
