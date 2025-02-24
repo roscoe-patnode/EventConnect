@@ -12,6 +12,7 @@
     let errorMessage = $state('');
     let rememberMe = $state(false);
     let resendMessage = $state('');
+    let signupSubmitted = $state(false);
     
     async function handleSignup() {
         try {
@@ -47,10 +48,12 @@
                     }
                 ]);
                 
-            if (profileError) throw profileError;
-            
-                // Success! Redirect to confirmation page
-                goto('/signup-success');
+                if (profileError) throw profileError;
+        
+                // Set flag to show verification banner
+                signupSubmitted = true;
+                // Don't redirect yet - only show verification banner
+                
             }
         } catch (error:any) {
             errorMessage = error.message || 'An error occurred during sign up';
@@ -124,6 +127,7 @@
         }
     }
 
+    // resend email
     async function handleResend() {
         try {
             const { error } = await supabase.auth.resend({ 
@@ -150,6 +154,31 @@
         {#if errorMessage}
             <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
                 <p class="text-red-700">{errorMessage}</p>
+            </div>
+        {/if}
+
+        <!-- Verification Banner - shows after successful signup -->
+        {#if signupSubmitted}
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+                <p class="text-blue-700">Please verify your email before signing in. Check your inbox for the verification link.</p>
+                <button 
+                    class="text-indigo-600 hover:underline mt-2 text-sm"
+                    onclick={handleResend}
+                >
+                    Resend verification email
+                </button>
+                {#if resendMessage.length > 0}
+                    <p class="text-sm text-green-600 mt-1">{resendMessage}</p>
+                {/if}
+                
+                <div class="mt-4">
+                    <button 
+                        onclick={() => pageState = "LogIn"}
+                        class="text-sm bg-indigo-600 text-white py-1 px-3 rounded-md hover:bg-indigo-700 transition-colors"
+                    >
+                        Go to Login
+                    </button>
+                </div>
             </div>
         {/if}
         
