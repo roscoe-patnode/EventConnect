@@ -8,60 +8,92 @@
     let lastName = '';
     let email = $state('');
     let password = '';
-    let accountType = 'personal'; // Default supabase value
+    let accountType = $state('personal'); // Default supabase value
     let errorMessage = $state('');
     let rememberMe = $state(false);
     let resendMessage = $state('');
     let signupSubmitted = $state(false);
     
-    async function handleSignup() {
-        try {
-            loading = true;
-            errorMessage = '';
+    // async function handleSignup() {
+    //     try {
+    //         loading = true;
+    //         errorMessage = '';
             
-            // 1. Register user with Supabase Auth
-            const { data: authData, error: authError } = await supabase.auth.signUp({
+    //         // 1. Register user with Supabase Auth
+    //         const { data: authData, error: authError } = await supabase.auth.signUp({
+    //         email,
+    //         password,
+    //         options: {
+    //             data: {
+    //             first_name: firstName,
+    //             last_name: lastName,
+    //             role: accountType // Store role in user metadata
+    //             }
+    //         }
+    //         });
+        
+    //         if (authError) throw authError;
+        
+    //         // 2. Insert additional user data into a custom 'Profiles' table
+    //         if (authData.user) {
+    //             const { error: profileError } = await supabase
+    //                 .from('profiles')
+    //                 .insert([
+    //                 { 
+    //                     id: authData.user.id,
+    //                     first_name: firstName,
+    //                     last_name: lastName,
+    //                     email: email,
+    //                     role: accountType
+    //                 }
+    //             ]);
+                
+    //             if (profileError) throw profileError;
+        
+    //             // Set flag to show verification banner
+    //             signupSubmitted = true;
+    //             // Don't redirect yet - only show verification banner
+                
+    //         }
+    //     } catch (error:any) {
+    //         errorMessage = error.message || 'An error occurred during sign up';
+    //         console.error('Error:', error);
+    //     } finally {
+    //         loading = false;
+    //     }
+    // }
+
+    async function handleSignup() {
+    try {
+        loading = true;
+        errorMessage = '';
+        
+        // Register user with Supabase Auth only
+        const { data: authData, error: authError } = await supabase.auth.signUp({
             email,
             password,
             options: {
                 data: {
-                first_name: firstName,
-                last_name: lastName,
-                role: accountType // Store role in user metadata
+                    first_name: firstName,
+                    last_name: lastName,
+                    role: accountType // Store role in user metadata
                 }
             }
-            });
+        });
+    
+        if (authError) throw authError;
+    
+        // Set flag to show verification banner
+        signupSubmitted = true;
+        // Don't create profile yet - this will happen on first sign-in after verification
         
-            if (authError) throw authError;
-        
-            // 2. Insert additional user data into a custom 'profiles' table
-            if (authData.user) {
-                const { error: profileError } = await supabase
-                    .from('profiles')
-                    .insert([
-                    { 
-                        id: authData.user.id,
-                        first_name: firstName,
-                        last_name: lastName,
-                        email: email,
-                        role: accountType
-                    }
-                ]);
-                
-                if (profileError) throw profileError;
-        
-                // Set flag to show verification banner
-                signupSubmitted = true;
-                // Don't redirect yet - only show verification banner
-                
-            }
-        } catch (error:any) {
-            errorMessage = error.message || 'An error occurred during sign up';
-            console.error('Error:', error);
-        } finally {
-            loading = false;
-        }
+    } catch (error:any) {
+        errorMessage = error.message || 'An error occurred during sign up';
+        console.error('Error:', error);
+    } finally {
+        loading = false;
     }
+}
 
     async function handleSignIn() {
         try {
@@ -79,7 +111,7 @@
                     expiresIn: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60
                 }
             });
-    
+
             if (error) throw error;
 
             // Check if email is verified
@@ -97,18 +129,44 @@
             
                 if (sessionError) throw sessionError;
             }
-    
-            // Fetch user profile to get role
-            const { data: profileData, error: profileError } = await supabase
+
+            // Check if profile exists
+            const { data: existingProfile, error: profileCheckError } = await supabase
                 .from('profiles')
-                .select('role')
+                .select('id, role')
                 .eq('id', data.user.id)
                 .single();
-    
-            if (profileError) throw profileError;
-    
-            // Redirect based on role
-            const role = profileData.role;
+
+            if (profileCheckError && profileCheckError.code !== 'PGRST116') {
+                // PGRST116 is the error code for "no rows returned" - that's expected if profile doesn't exist
+                // For any other error, throw it
+                throw profileCheckError;
+            }
+
+            // If profile doesn't exist, create it now
+            if (!existingProfile) {
+                // Get user metadata to create profile
+                const { data: userData } = await supabase.auth.getUser();
+                const userMetadata = userData.user?.user_metadata || {};
+                
+                const { error: createProfileError } = await supabase
+                    .from('profiles')
+                    .insert([
+                    { 
+                        id: data.user.id,
+                        first_name: userMetadata.first_name || '',
+                        last_name: userMetadata.last_name || '',
+                        email: data.user.email,
+                        role: userMetadata.role || 'personal'
+                    }
+                ]);
+                
+                if (createProfileError) throw createProfileError;
+            }
+
+            // Redirect based on role (either from existing profile or newly created one)
+            const role = existingProfile?.role;
+            
             if (role === 'event_planner') {
                 goto('/dashboard/planner');
             } else if (role === 'facility_owner') {
@@ -116,9 +174,9 @@
             } else if (role === 'staff_member') {
                 goto('/dashboard/staff');
             } else {
-            goto('/dashboard');
+                goto('/dashboard');
             }
-    
+
         } catch (error: any) {
             errorMessage = error.message || 'Failed to sign in';
             console.error('Error:', error);
@@ -126,6 +184,71 @@
             loading = false;
         }
     }
+
+    // async function handleSignIn() {
+    //     try {
+    //         loading = true;
+    //         errorMessage = '';
+            
+    //         // Supabase sign in
+    //         const { data, error } = await supabase.auth.signInWithPassword({
+    //             email,
+    //             password,
+    //             options: {
+    //                 // Set session duration based on rememberMe
+    //                 // 30 days if remember me is checked, 1 hour if not
+    //                 // @ts-ignore
+    //                 expiresIn: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60
+    //             }
+    //         });
+    
+    //         if (error) throw error;
+
+    //         // Check if email is verified
+    //         if (!data.user?.email_confirmed_at) {
+    //             errorMessage = 'Please verify your email before signing in. Check your inbox for the verification link.';
+    //             return;
+    //         }
+
+    //         // If remember me is checked, store the session
+    //         if (rememberMe) {
+    //             const { error: sessionError } = await supabase.auth.setSession({
+    //                 access_token: data.session.access_token,
+    //                 refresh_token: data.session.refresh_token
+    //             });
+            
+    //             if (sessionError) throw sessionError;
+    //         }
+    
+    //         // Fetch user profile to get role
+    //         const { data: profileData, error: profileError } = await supabase
+    //             .from('profiles')
+    //             .select('role')
+    //             .eq('id', data.user.id)
+    //             .single();
+    
+    //         if (profileError) throw profileError;
+    
+    //         // Redirect based on role
+    //         const role = profileData.role;
+    //         if (role === 'event_planner') {
+    //             goto('/dashboard/planner');
+    //         } else if (role === 'facility_owner') {
+    //             goto('/dashboard/facility_owner');
+    //         } else if (role === 'staff_member') {
+    //             goto('/dashboard/staff');
+    //         } else {
+    //         goto('/dashboard');
+    //         }
+    
+    //     } catch (error: any) {
+    //         errorMessage = error.message || 'Failed to sign in';
+    //         console.error('Error:', error);
+    //     } finally {
+    //         loading = false;
+    //     }
+    // }
+
 
     // resend email
     async function handleResend() {
@@ -276,7 +399,6 @@
             >
             {loading ? 'Creating Account...' : 'Create Account'}
             </button>
-            <!-- onclick= {handleSignup} -->
         </div>
         
         <!-- Sign in link -->

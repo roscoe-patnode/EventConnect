@@ -1,12 +1,16 @@
 <script lang="ts">
+
     import { supabase } from "$lib/supabaseClient";
     import { onMount } from 'svelte';
 
+    // Create and event vars
     let showCreateForm = $state(false);
     let events:any = $state([]);
+
     // Variables for edit functionality
     let showEditForm = $state(false);
     let currentEvent:any = $state(null);
+
     
     // Form fields
     let eventName = '';
@@ -17,6 +21,14 @@
     let salesEmail = '';
     let venueWebsite = '';
     let eventDate = '';
+
+    // Collab invite vars
+    let showInviteForm = $state(false);
+    let currentInviteEvent:any = $state(null);
+    let inviteEmail = '';
+    let inviteLoading = $state(false);
+    let inviteError = $state('');
+    let inviteSuccess = $state('');
 
     async function fetchEvents() {
         try {
@@ -131,6 +143,8 @@
         e.preventDefault();
 
         try {
+
+            // Update events in database
             const { error } = await supabase
                 .from('events')
                 .update({
@@ -147,7 +161,7 @@
 
             if (error) throw error;
 
-            // Update the event in local state
+            // Update the event in local state (on UI)
             events = events.map((event: any) => 
                 event.id === currentEvent.id ? currentEvent : event
             );
@@ -156,6 +170,132 @@
 
         } catch (error) {
             console.error('Error updating event:', error);
+        }
+    }
+
+    // Function to open the invite modal
+    function inviteCollaborator(event: any) {
+        currentInviteEvent = { ...event };
+        showInviteForm = true;
+    }
+
+    // Function to close the invite modal
+    function closeInviteModal() {
+        currentInviteEvent = null;
+        inviteEmail = '';
+        inviteError = '';
+        inviteSuccess = '';
+        showInviteForm = false;
+    }
+
+    // Function to handle the invitation process
+    async function handleInviteCollaborator(e: SubmitEvent) {
+        e.preventDefault();
+        inviteLoading = true;
+        inviteError = '';
+        inviteSuccess = '';
+
+        try {
+            // Get the current user
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (!user) throw new Error('User not authenticated');
+            
+            // Check if the invited user exists in the system
+            const { data: existingUsers, error: userQueryError } = await supabase
+                .from('profiles')
+                .select('id, email, user_type')
+                .eq('email', inviteEmail);
+            
+            if (userQueryError) throw userQueryError;
+            
+            let invitedUserId = null;
+            let needsEmailInvite = false;
+            
+            if (existingUsers && existingUsers.length > 0) {
+                // User exists in the system
+                invitedUserId = existingUsers[0].id;
+            } else {
+                // User doesn't exist, we'll need to send an email
+                needsEmailInvite = true;
+            }
+
+            // Create or find a chat room between these users
+            const { data: existingChatRoom, error: chatRoomQueryError } = await supabase
+                .from('chat_rooms')
+                .select('id')
+                .or(`(user1_id.eq.${user.id}.and.user2_id.eq.${invitedUserId || 'null'}),(user1_id.eq.${invitedUserId || 'null'}.and.user2_id.eq.${user.id})`)
+                .maybeSingle();
+                
+            if (chatRoomQueryError) throw chatRoomQueryError;
+            
+            let chatRoomId;
+            
+            if (existingChatRoom) {
+                // Chat room already exists
+                chatRoomId = existingChatRoom.id;
+            } else {
+                // Create a new chat room
+                const { data: newChatRoom, error: createChatRoomError } = await supabase
+                    .from('chat_rooms')
+                    .insert({
+                        user1_id: user.id,
+                        user2_id: invitedUserId, // This will be null if the user doesn't exist yet
+                        created_at: new Date().toISOString(),
+                        pending_invitee_email: needsEmailInvite ? inviteEmail : null
+                    })
+                    .select();
+                    
+                if (createChatRoomError) throw createChatRoomError;
+                
+                chatRoomId = newChatRoom[0].id;
+            }
+            
+            // Send the collaboration invitation message
+            const { error: sendMessageError } = await supabase
+                .from('messages')
+                .insert({
+                    chat_room_id: chatRoomId,
+                    sender_id: user.id,
+                    message_type: 'collaboration_invite',
+                    content: JSON.stringify({
+                        event_id: currentInviteEvent.id,
+                        event_name: currentInviteEvent.event_name,
+                        event_date: currentInviteEvent.event_date,
+                        venue_name: currentInviteEvent.venue_name
+                    }),
+                    created_at: new Date().toISOString(),
+                    status: 'sent'
+                });
+                
+            if (sendMessageError) throw sendMessageError;
+            
+            // If the user doesn't exist, send an email invitation
+            if (needsEmailInvite) {
+                // This would typically be handled by a server function or edge function in production
+                // For now, we'll just log it and update our UI
+                console.log(`Would send email to ${inviteEmail} about collaboration invitation`);
+                
+                // Supabase Edge Functions or a serverless function
+                // const { error: emailError } = await supabase.functions.invoke('send-collaboration-email', {
+                //     body: { 
+                //         email: inviteEmail, 
+                //         eventName: currentInviteEvent.event_name,
+                //         inviterName: user.email || "A facility owner",
+                //         signupLink: `https://yourdomain.com/signup?email=${encodeURIComponent(inviteEmail)}&invite=true` 
+                //     }
+                // });
+                // if (emailError) throw emailError;
+            }
+            
+            inviteSuccess = `Invitation sent to ${inviteEmail}!`;
+            setTimeout(() => closeInviteModal(), 2000);
+            
+        } catch (error) {
+            console.error('Error sending invitation:', error);
+            inviteError = 'Failed to send invitation. Please try again.';
+        } finally {
+            inviteLoading = false;
         }
     }
 
@@ -300,6 +440,7 @@
     {/if}
 
     <!-- Edit Form Modal -->
+    <!-- && currentEvent in if may be redundant will double check maybe? -->
     {#if showEditForm && currentEvent}
         <div class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
             <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
@@ -423,7 +564,77 @@
                 </form>
             </div>
         </div>
-    {/if}   
+    {/if}
+
+    <!-- Invite Modal -->
+    {#if showInviteForm && currentInviteEvent}
+    <div class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-semibold text-gray-900">Invite Collaborator</h2>
+                <!-- svelte-ignore a11y_consider_explicit_label -->
+                <button 
+                    onclick={closeInviteModal}
+                    class="text-gray-400 hover:text-gray-500"
+                >
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            
+            <p class="mb-4 text-gray-600">
+                Inviting a collaborator to "{currentInviteEvent.event_name}" on {new Date(currentInviteEvent.event_date).toLocaleDateString()}
+            </p>
+            
+            <form onsubmit={handleInviteCollaborator} class="space-y-6">
+                <div>
+                    <label for="inviteEmail" class="block text-sm font-medium text-gray-700">Collaborator Email</label>
+                    <input
+                        type="email"
+                        id="inviteEmail"
+                        bind:value={inviteEmail}
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        placeholder="email@example.com"
+                        required
+                    />
+                </div>
+                
+                {#if inviteError}
+                    <div class="text-red-600 text-sm">{inviteError}</div>
+                {/if}
+                
+                {#if inviteSuccess}
+                    <div class="text-green-600 text-sm">{inviteSuccess}</div>
+                {/if}
+                
+                <div class="flex justify-end space-x-4">
+                    <button
+                        type="button"
+                        onclick={closeInviteModal}
+                        class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        disabled={inviteLoading}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center"
+                        disabled={inviteLoading}
+                    >
+                        {#if inviteLoading}
+                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        {/if}
+                        Send Invitation
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {/if}
     
     <!-- Events List -->
     <div class="mt-8">
@@ -446,11 +657,11 @@
                                         title="Edit event"
                                     >
                                         <svg 
-                                        xmlns="http://www.w3.org/2000/svg" 
-                                        class="h-5 w-5" 
-                                        fill="none" 
-                                        viewBox="0 0 24 24" 
-                                        stroke="currentColor"
+                                            xmlns="http://www.w3.org/2000/svg" 
+                                            class="h-5 w-5" 
+                                            fill="none" 
+                                            viewBox="0 0 24 24" 
+                                            stroke="currentColor"
                                         >
                                             <path 
                                                 stroke-linecap="round" 
@@ -479,6 +690,29 @@
                                                 stroke-linejoin="round" 
                                                 stroke-width="2" 
                                                 d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" 
+                                            />
+                                        </svg>
+                                    </button>
+
+                                    <!-- svelte-ignore a11y_consider_explicit_label -->
+                                    <!-- Invite to collab -->
+                                    <button 
+                                        onclick={() => inviteCollaborator(event)}
+                                        class="text-gray-400 hover:text-green-600 transition-colors"
+                                        title="Invite collaborator"
+                                    >
+                                        <svg 
+                                            xmlns="http://www.w3.org/2000/svg" 
+                                            class="h-5 w-5" 
+                                            fill="none" 
+                                            viewBox="0 0 24 24" 
+                                            stroke="currentColor"
+                                        >
+                                            <path 
+                                                stroke-linecap="round" 
+                                                stroke-linejoin="round" 
+                                                stroke-width="2" 
+                                                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" 
                                             />
                                         </svg>
                                     </button>
