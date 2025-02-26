@@ -130,27 +130,17 @@
                 if (sessionError) throw sessionError;
             }
 
-            // Check if profile exists
-            const { data: existingProfile, error: profileCheckError } = await supabase
-                .from('profiles')
-                .select('id, role')
-                .eq('id', data.user.id)
-                .single();
-
-            if (profileCheckError && profileCheckError.code !== 'PGRST116') {
-                // PGRST116 is the error code for "no rows returned" - that's expected if profile doesn't exist
-                // For any other error, throw it
-                throw profileCheckError;
-            }
+            // // Check if profile exists
+            
 
             // If profile doesn't exist, create it now
-            if (!existingProfile) {
+            try {
                 // Get user metadata to create profile
                 const { data: userData } = await supabase.auth.getUser();
                 const userMetadata = userData.user?.user_metadata || {};
                 
                 const { error: createProfileError } = await supabase
-                    .from('profiles')
+                    .from('Profiles')
                     .insert([
                     { 
                         id: data.user.id,
@@ -163,16 +153,30 @@
                 
                 if (createProfileError) throw createProfileError;
             }
+            catch (error:any) {
 
+            }
+
+            const { data: existingProfile, error: profileCheckError } = await supabase
+                .from('Profiles')
+                .select('id, role')
+                .eq('id', data.user.id)
+                .single();
+
+            if (profileCheckError && profileCheckError.code !== 'PGRST116') {
+                // PGRST116 is the error code for "no rows returned" - that's expected if profile doesn't exist
+                // For any other error, throw it
+                throw profileCheckError;
+            }
             // Redirect based on role (either from existing profile or newly created one)
             const role = existingProfile?.role;
             
-            if (role === 'event_planner') {
-                goto('/dashboard/planner');
-            } else if (role === 'facility_owner') {
-                goto('/dashboard/facility_owner');
-            } else if (role === 'staff_member') {
-                goto('/dashboard/staff');
+            if (role === 'event_manager') {
+                goto('/dashboard/event_manager');
+            } else if (role === 'venue_admin') {
+                goto('/dashboard/venue_admin');
+            } else if (role === 'venue_staff') {
+                goto('/dashboard/venue_staff');
             } else {
                 goto('/dashboard');
             }
@@ -310,16 +314,16 @@
         <label class="block text-gray-700 font-medium mb-3">Account Type</label>
             <div class="flex space-x-6">
                 <label class="flex items-center">
-                <input type="radio" bind:group={accountType} name="accountType" value="event_planner" class="h-5 w-5 text-indigo-600" checked>
-                <span class="ml-2 text-gray-700">Event Planner</span>
+                <input type="radio" bind:group={accountType} name="accountType" value="event_manager" class="h-5 w-5 text-indigo-600" checked>
+                <span class="ml-2 text-gray-700">Event Manager</span>
                 </label>
                 <label class="flex items-center">
-                <input type="radio" bind:group={accountType} name="accountType" value="facility_owner" class="h-5 w-5 text-indigo-600">
-                <span class="ml-2 text-gray-700">Facility Owner</span>
+                <input type="radio" bind:group={accountType} name="accountType" value="venue_admin" class="h-5 w-5 text-indigo-600">
+                <span class="ml-2 text-gray-700">Venue Admin</span>
                 </label>
                 <label class="flex items-center">
-                <input type="radio" bind:group={accountType} name="accountType" value="staff_member" class="h-5 w-5 text-indigo-600">
-                <span class="ml-2 text-gray-700">Staff member</span>
+                <input type="radio" bind:group={accountType} name="accountType" value="venue_staff" class="h-5 w-5 text-indigo-600">
+                <span class="ml-2 text-gray-700">Venue Staff</span>
                 </label>
             </div>
         </div>

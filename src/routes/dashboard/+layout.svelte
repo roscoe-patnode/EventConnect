@@ -14,7 +14,7 @@
             if (user) {
                 // Fetch user's role from profiles table
                 const { data: profileData, error } = await supabase
-                    .from('profiles')
+                    .from('Profiles')
                     .select('role')
                     .eq('id', user.id)
                     .single();
@@ -48,19 +48,19 @@
     // Navigation items based on role
     const navItems:any = {
         event_planner: [
-            { href: "/dashboard/planner/events", label: "My Events" },// Made specific event pages for roles 
-            { href: "/dashboard/planner/calendar", label: "Calendar" },
+            { href: "/dashboard/event_manager/events", label: "My Events" },// Made specific event pages for roles 
+            { href: "/dashboard/event_manager/calendar", label: "Calendar" },
             { href: "/dashboard/chat", label: "Chat" }// Made one "reactive" chat page that changes depending on roles 
         ],
         facility_owner: [
-            { href: "/dashboard/facility_owner/events", label: "My Events" },
-            { href: "/dashboard/facility_owner/calendar", label: "Calendar" },
+            { href: "/dashboard/venue_admin/events", label: "My Events" },
+            { href: "/dashboard/venue_admin/calendar", label: "Calendar" },
             { href: "/dashboard/chat", label: "Chat" }
         ],
         staff_member: [
-            { href: "/dashboard/staff/tasks", label: "Tasks" },
-            { href: "/dashboard/staff/schedule", label: "Schedule" },
-            { href: "/dashboard/staff/reports", label: "Reports" }
+            { href: "/dashboard/venue_staff/tasks", label: "Tasks" },
+            { href: "/dashboard/venue_staff/schedule", label: "Schedule" },
+            { href: "/dashboard/venue_staff/reports", label: "Reports" }
         ]
     };
 
@@ -76,8 +76,8 @@
                     <a href="/" class="flex items-center">
                         <span class="text-xl font-bold text-indigo-600">
                             {#if userRole}
-                                {userRole === 'event_planner' ? 'Event Dashboard' :
-                                 userRole === 'facility_owner' ? 'Facility Dashboard' :
+                                {userRole === 'event_manager' ? 'Event Dashboard' :
+                                 userRole === 'venue_admin' ? 'Facility Dashboard' :
                                  'Staff Dashboard'}
                             {:else}
                                 Dashboard

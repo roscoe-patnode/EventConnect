@@ -36,14 +36,14 @@
             
             if (!user) throw new Error('User not authenticated');
 
-            const { data, error } = await supabase
-                .from('events')
-                .select('*')
-                .eq('user_id', user.id);
+            // const { data, error } = await supabase
+            //     .from('events')
+            //     .select('*')
+            //     .eq('user_id', user.id);
 
-            if (error) throw error;
+            // if (error) throw error;
 
-            events = data;
+            // events = data;
 
         } catch (error) {
             console.error('Error fetching events:', error);
@@ -203,7 +203,7 @@
             
             // Check if the invited user exists in the system
             const { data: existingUsers, error: userQueryError } = await supabase
-                .from('profiles')
+                .from('Profiles')
                 .select('id, email, user_type')
                 .eq('email', inviteEmail);
             
