@@ -47,17 +47,17 @@
 
     // Navigation items based on role
     const navItems:any = {
-        event_planner: [
+        event_manager: [
             { href: "/dashboard/event_manager/events", label: "My Events" },// Made specific event pages for roles 
             { href: "/dashboard/event_manager/calendar", label: "Calendar" },
             { href: "/dashboard/chat", label: "Chat" }// Made one "reactive" chat page that changes depending on roles 
         ],
-        facility_owner: [
+        venue_admin: [
             { href: "/dashboard/venue_admin/events", label: "My Events" },
             { href: "/dashboard/venue_admin/calendar", label: "Calendar" },
             { href: "/dashboard/chat", label: "Chat" }
         ],
-        staff_member: [
+        venue_staff: [
             { href: "/dashboard/venue_staff/tasks", label: "Tasks" },
             { href: "/dashboard/venue_staff/schedule", label: "Schedule" },
             { href: "/dashboard/venue_staff/reports", label: "Reports" }
