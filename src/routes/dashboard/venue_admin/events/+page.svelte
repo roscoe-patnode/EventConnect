@@ -4,23 +4,22 @@
     import { onMount } from 'svelte';
 
     // Create and event vars
-    let showCreateForm = $state(false);
-    let events:any = $state([]);
+    let showCreateEventForm = $state(false);
 
     // Variables for edit functionality
     let showEditForm = $state(false);
     let currentEvent:any = $state(null);
 
     
-    // Form fields
-    let eventName = '';
-    let venueName = '';
-    let venueAddress = '';
-    let venuePhone = '';
-    let salesContact = '';
-    let salesEmail = '';
-    let venueWebsite = '';
-    let eventDate = '';
+    // Event Form fields
+    let eventTitle = $state('');
+    let eventExpectAttend = $state(0);
+    let eventStartDate = $state('');
+    let eventEndDate = $state('');
+    let eventVenueId = $state('');
+    let eventEventSpace = $state('');
+    let eventSpaceSetup = $state('');
+
 
     // Collab invite vars
     let showInviteForm = $state(false);
@@ -30,78 +29,197 @@
     let inviteError = $state('');
     let inviteSuccess = $state('');
 
+    // Class to store Venue information
+    class Venue {
+        id = "";
+        name = "";
+        address = "";
+        phone = "";
+        website = "";
+        totalSpace = 0;
+        services = [];
+
+        constructor(id:string, name:string, address:string, phone:string, website:string, totalSpace:number, services:[]) {
+            this.id = id;
+            this.name = name;
+            this.address = address;
+            this.phone = phone;
+            this.website = website;
+            this.totalSpace = totalSpace;
+            this.services = services;
+        }
+    }
+
+    // Classes to store Event information
+    class EventSpace {
+        id = "";
+        name = "";
+        size = 0;
+        ceilings = 0;
+        spaceSetups = new Map();
+
+        constructor(id:string, name:string, size:number, ceilings:number) {
+            this.id = id;
+            this.name = name;
+            this.size = size;
+            this.ceilings = ceilings;
+        }
+    }
+    class Event {
+        id = "";
+        title = "";
+        dates = [];
+        expectAttend = 0;
+        bookedSpaces:any = [];
+
+        constructor(id:string, title:string, dates:[], expectAttend:number) {
+            this.id = id;
+            this.title = title;
+            this.dates = dates;
+            this.expectAttend = expectAttend;
+        }
+    }
+    // Venues array
+    let venues:any = $state([]);
+    // Events array
+    let events:any = $state([]);
+    // All event spaces
+    let allEventSpaces = new Map();
+
+    async function fetchVenues() {
+        try {
+            const {data, error} = await supabase
+                .from('Venues')
+                .select('*');
+            if (error) throw error;
+            for (const row of data) {
+                venues.push(new Venue(row.id, row.name, row.address, row.phone, row.website, row.total_space, row.services));
+            }
+        } catch (error) {
+            console.error("Error fetching Venues", error);
+        }
+    }
+
+    async function fetchVenueEventSpaces() {
+        // Get Venue Event Spaces
+        try {
+            const { data, error } = await supabase
+                .from('EventSpaces')
+                .select('*');
+            if (error) throw error;
+            for (const row of data) {
+                allEventSpaces.set(row.id, new EventSpace(row.id, row.name, row.size, row.ceilings));
+            }
+        } catch(error) {
+            console.error("Error fetching Venue Event Spaces", error);
+        }
+
+        // Get Event Space Setups
+        try {
+            const { data, error } = await supabase
+                .from('SpaceSetups')
+                .select('*');
+            if (error) throw error;
+            for (const row of data) {
+                allEventSpaces.get(row.event_space_id).spaceSetups.set(row.name, row.capacity);
+            }
+        } catch(error) {
+            console.error("Error fetching Event Space Setups")
+        }
+    }
+
     async function fetchEvents() {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             
             if (!user) throw new Error('User not authenticated');
 
-            // const { data, error } = await supabase
-            //     .from('events')
-            //     .select('*')
-            //     .eq('user_id', user.id);
+            // Get Events and add event to array
+            const { data, error } = await supabase
+                .from('Events')
+                .select('*');
 
-            // if (error) throw error;
-
-            // events = data;
-
+            if (error) throw error;
+            for (const row of data) {
+                events.push(new Event(row.id, row.title, row.dates, row.expect_attend));
+            }
         } catch (error) {
             console.error('Error fetching events:', error);
         }
+
+        // Get Event Spaces
+        try {
+            const { data, error } = await supabase
+                .from('BookedEventSpacesList')
+                .select('*');
+            if (error) throw error;
+            for (const row of data) {
+                if (error) throw error;
+                for (const row of data) {
+                    for (const e of events) {
+                        if (e.id = row.event_id) {
+                            e.bookedSpaces.push(allEventSpaces.get(row.event_space_id))
+                            break;
+                        }
+                    }
+                }
+            }
+            
+        } catch (error) {
+            console.error("Error fetching Event Spaces", error)
+        }
+
     }
 
     onMount(async () => {// Loading the database info from supabase
+        await fetchVenues();
+        await fetchVenueEventSpaces();
         await fetchEvents();
     });
     
     async function handleCreateEvent(e: SubmitEvent) {
         e.preventDefault();
-    
         try {
             // Get the current user
             const { data: { user } } = await supabase.auth.getUser();
             
             if (!user) throw new Error('User not authenticated');
+            console.log(user)
+            const arrDates = [];
+            for(const dt=new Date(eventStartDate); dt<=new Date(eventEndDate); dt.setDate(dt.getDate()+1)){
+                arrDates.push(new Date(dt));
+            }
 
-            // Insert into Supabase
+            // Insert into Events Table
             const { data, error } = await supabase
-                .from('events')
+                .from('Events')
                 .insert([
                     {
-                        user_id: user.id,
-                        event_name: eventName,
-                        venue_name: venueName,
-                        venue_address: venueAddress,
-                        venue_phone: venuePhone,
-                        sales_contact: salesContact,
-                        sales_email: salesEmail,
-                        venue_website: venueWebsite,
-                        event_date: eventDate
+                        title: eventTitle,
+                        dates: arrDates,
+                        expect_attend: eventExpectAttend,
+                        venue_id: eventVenueId
                     }
                 ])
-                .select();
+                .select('*');
 
             if (error) throw error;
-
             // Add new event to local state
             events = [...events, data[0]];
-            resetForm();
+            resetEventForm();
 
         } catch (error) {
             console.error('Error creating event:', error);
         }
+        
     }
     
-    function resetForm() {
-        eventName = '';
-        venueName = '';
-        venueAddress = '';
-        venuePhone = '';
-        salesContact = '';
-        salesEmail = '';
-        venueWebsite = '';
-        eventDate = '';
-        showCreateForm = false;
+    function resetEventForm() {
+        eventTitle = '';
+        eventExpectAttend = 0;
+        eventStartDate = '';
+        eventEndDate = '';
+        showCreateEventForm = false;
     }
 
     async function handleRemoveEvent(eventId: string) {
@@ -112,7 +230,7 @@
         try {
             // Delete from Supabase
             const { error } = await supabase
-                .from('events')
+                .from('Events')
                 .delete()
                 .eq('id', eventId);
 
@@ -135,27 +253,26 @@
     // Function to close edit modal
     function closeEditModal() {
         currentEvent = null;
+        eventVenueId = "";
         showEditForm = false;
     }
 
     // Function to handle event updates
     async function handleEditEvent(e: SubmitEvent) {
         e.preventDefault();
-
+        const arrDates = [];
+        for(const dt=new Date(currentEvent.dates[0]); dt<=new Date(currentEvent.dates[currentEvent.dates.length-1]); dt.setDate(dt.getDate()+1)){
+            arrDates.push(new Date(dt));
+        }
         try {
-
             // Update events in database
             const { error } = await supabase
-                .from('events')
+                .from('Events')
                 .update({
-                    event_name: currentEvent.event_name,
-                    venue_name: currentEvent.venue_name,
-                    venue_address: currentEvent.venue_address,
-                    venue_phone: currentEvent.venue_phone,
-                    sales_contact: currentEvent.sales_contact,
-                    sales_email: currentEvent.sales_email,
-                    venue_website: currentEvent.venue_website,
-                    event_date: currentEvent.event_date
+                    title: currentEvent.title,
+                    expect_attend: currentEvent.expectAttend,
+                    dates: arrDates,
+                    venue_id: eventVenueId
                 })
                 .eq('id', currentEvent.id);
 
@@ -277,15 +394,15 @@
                 console.log(`Would send email to ${inviteEmail} about collaboration invitation`);
                 
                 // Supabase Edge Functions or a serverless function
-                // const { error: emailError } = await supabase.functions.invoke('send-collaboration-email', {
-                //     body: { 
-                //         email: inviteEmail, 
-                //         eventName: currentInviteEvent.event_name,
-                //         inviterName: user.email || "A facility owner",
-                //         signupLink: `https://yourdomain.com/signup?email=${encodeURIComponent(inviteEmail)}&invite=true` 
-                //     }
-                // });
-                // if (emailError) throw emailError;
+                const { error: emailError } = await supabase.functions.invoke('send-collaboration-email', {
+                    body: { 
+                        email: inviteEmail, 
+                        eventName: currentInviteEvent.event_name,
+                        inviterName: user.email || "A facility owner",
+                        signupLink: `https://yourdomain.com/signup?email=${encodeURIComponent(inviteEmail)}&invite=true` 
+                    }
+                });
+                if (emailError) throw emailError;
             }
             
             inviteSuccess = `Invitation sent to ${inviteEmail}!`;
@@ -306,7 +423,7 @@
         <h1 class="text-3xl font-bold text-gray-900">Events</h1>
             <!-- Create Event Button -->
             <button 
-                onclick={() => showCreateForm = true}
+                onclick={() => showCreateEventForm = true}
                 class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
             >
                 Create New Event
@@ -314,14 +431,14 @@
     </div>
     
     <!-- Create Form modal -->
-    {#if showCreateForm}
+    {#if showCreateEventForm}
         <div class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
             <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-2xl font-semibold text-gray-900">Create New Event</h2>
                     <!-- svelte-ignore a11y_consider_explicit_label -->
                     <button 
-                        onclick={resetForm}
+                        onclick={resetEventForm}
                         class="text-gray-400 hover:text-gray-500"
                     >
                         <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -332,97 +449,67 @@
                 
                 <form onsubmit={handleCreateEvent} class="space-y-6">
                     <div>
-                        <label for="eventName" class="block text-sm font-medium text-gray-700">Event Name</label>
+                        <label for="eventTitle" class="block text-sm font-medium text-gray-700">Event Title</label>
                         <input
                             type="text"
-                            id="eventName"
-                            bind:value={eventName}
+                            id="eventTitle"
+                            bind:value={eventTitle}
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             required
                         />
                     </div>
 
                     <div>
-                        <label for="eventDate" class="block text-sm font-medium text-gray-700">Event Date</label>
+                        <label for="eventExpectAttend" class="block text-sm font-medium text-gray-700">Expected Attendance</label>
+                        <input
+                            type="number"
+                            id="eventExpectAttend"
+                            bind:value={eventExpectAttend}
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label for="eventStartDate" class="block text-sm font-medium text-gray-700">Event Start Date</label>
                         <input
                             type="date"
-                            id="eventDate"
-                            bind:value={eventDate}
+                            id="eventStartDate"
+                            bind:value={eventStartDate}
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             required
                         />
                     </div>
-                    
+
                     <div>
-                        <label for="venueName" class="block text-sm font-medium text-gray-700">Venue Name</label>
+                        <label for="eventEndDate" class="block text-sm font-medium text-gray-700">Event End Date</label>
                         <input
-                            type="text"
-                            id="venueName"
-                            bind:value={venueName}
+                            type="date"
+                            id="eventEndDate"
+                            bind:value={eventEndDate}
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             required
                         />
                     </div>
-                    
+
                     <div>
-                        <label for="venueAddress" class="block text-sm font-medium text-gray-700">Venue Address</label>
-                        <input
-                            type="text"
-                            id="venueAddress"
-                            bind:value={venueAddress}
+                        <label for="eventVenueId" class="block text-sm font-medium text-gray-700">Venue</label>
+                        <select
+                            id="eventVenueId"
+                            bind:value={eventVenueId}
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             required
-                        />
-                    </div>
-                    
-                    <div>
-                        <label for="venuePhone" class="block text-sm font-medium text-gray-700">Venue Phone</label>
-                        <input
-                            type="tel"
-                            id="venuePhone"
-                            bind:value={venuePhone}
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            required
-                        />
-                    </div>
-                    
-                    <div>
-                        <label for="salesContact" class="block text-sm font-medium text-gray-700">Lead Event Sales Contact</label>
-                        <input
-                            type="text"
-                            id="salesContact"
-                            bind:value={salesContact}
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            required
-                        />
-                    </div>
-                    
-                    <div>
-                        <label for="salesEmail" class="block text-sm font-medium text-gray-700">Lead Event Sales Email</label>
-                        <input
-                            type="email"
-                            id="salesEmail"
-                            bind:value={salesEmail}
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            required
-                        />
-                    </div>
-                    
-                    <div>
-                        <label for="venueWebsite" class="block text-sm font-medium text-gray-700">Venue Website</label>
-                        <input
-                            type="url"
-                            id="venueWebsite"
-                            bind:value={venueWebsite}
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            required
-                        />
+                        >
+                        {#each venues as venue}
+                        <option value={venue.id}>{venue.name}</option>
+                        {/each}
+                        </select>
                     </div>
                     
                     <div class="flex justify-end space-x-4">
                         <button
                             type="button"
-                            onclick={resetForm}
+                            onclick={resetEventForm}
                             class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                         >
                             Cancel
@@ -459,91 +546,61 @@
                 
                 <form onsubmit={handleEditEvent} class="space-y-6">
                     <div>
-                        <label for="editEventName" class="block text-sm font-medium text-gray-700">Event Name</label>
+                        <label for="editEventTitle" class="block text-sm font-medium text-gray-700">Event Title</label>
                         <input
                             type="text"
-                            id="editEventName"
-                            bind:value={currentEvent.event_name}
+                            id="editEventTitle"
+                            bind:value={currentEvent.title}
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             required
                         />
                     </div>
 
                     <div>
-                        <label for="editEventDate" class="block text-sm font-medium text-gray-700">Event Date</label>
+                        <label for="editEventExpectAttend" class="block text-sm font-medium text-gray-700">Expected Attendance</label>
+                        <input
+                            type="number"
+                            id="editEventExpectAttend"
+                            bind:value={currentEvent.expectAttend}
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label for="editEventStartDate" class="block text-sm font-medium text-gray-700">Event Start Date</label>
                         <input
                             type="date"
-                            id="editEventDate"
-                            bind:value={currentEvent.event_date}
+                            id="editEventStartDate"
+                            bind:value={currentEvent.dates[0]}
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             required
                         />
                     </div>
-                    
+
                     <div>
-                        <label for="editVenueName" class="block text-sm font-medium text-gray-700">Venue Name</label>
+                        <label for="editEventEndDate" class="block text-sm font-medium text-gray-700">Event End Date</label>
                         <input
-                            type="text"
-                            id="editVenueName"
-                            bind:value={currentEvent.venue_name}
+                            type="date"
+                            id="editEventEndDate"
+                            bind:value={currentEvent.dates[currentEvent.dates.length - 1]}
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             required
                         />
                     </div>
-                    
+
                     <div>
-                        <label for="editVenueAddress" class="block text-sm font-medium text-gray-700">Venue Address</label>
-                        <input
-                            type="text"
-                            id="editVenueAddress"
-                            bind:value={currentEvent.venue_address}
+                        <label for="editEventVenueId" class="block text-sm font-medium text-gray-700">Venue</label>
+                        <select
+                            id="editEventVenueId"
+                            bind:value={eventVenueId}
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             required
-                        />
-                    </div>
-                    
-                    <div>
-                        <label for="editVenuePhone" class="block text-sm font-medium text-gray-700">Venue Phone</label>
-                        <input
-                            type="tel"
-                            id="editVenuePhone"
-                            bind:value={currentEvent.venue_phone}
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            required
-                        />
-                    </div>
-                    
-                    <div>
-                        <label for="editSalesContact" class="block text-sm font-medium text-gray-700">Lead Event Sales Contact</label>
-                        <input
-                            type="text"
-                            id="editSalesContact"
-                            bind:value={currentEvent.sales_contact}
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            required
-                        />
-                    </div>
-                    
-                    <div>
-                        <label for="editSalesEmail" class="block text-sm font-medium text-gray-700">Lead Event Sales Email</label>
-                        <input
-                            type="email"
-                            id="editSalesEmail"
-                            bind:value={currentEvent.sales_email}
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            required
-                        />
-                    </div>
-                    
-                    <div>
-                        <label for="editVenueWebsite" class="block text-sm font-medium text-gray-700">Venue Website</label>
-                        <input
-                            type="url"
-                            id="editVenueWebsite"
-                            bind:value={currentEvent.venue_website}
-                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            required
-                        />
+                        >
+                        {#each venues as venue}
+                        <option value={venue.id}>{venue.name}</option>
+                        {/each}
+                        </select>
                     </div>
                     
                     <div class="flex justify-end space-x-4">
@@ -566,75 +623,7 @@
         </div>
     {/if}
 
-    <!-- Invite Modal -->
-    {#if showInviteForm && currentInviteEvent}
-    <div class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-semibold text-gray-900">Invite Collaborator</h2>
-                <!-- svelte-ignore a11y_consider_explicit_label -->
-                <button 
-                    onclick={closeInviteModal}
-                    class="text-gray-400 hover:text-gray-500"
-                >
-                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-            
-            <p class="mb-4 text-gray-600">
-                Inviting a collaborator to "{currentInviteEvent.event_name}" on {new Date(currentInviteEvent.event_date).toLocaleDateString()}
-            </p>
-            
-            <form onsubmit={handleInviteCollaborator} class="space-y-6">
-                <div>
-                    <label for="inviteEmail" class="block text-sm font-medium text-gray-700">Collaborator Email</label>
-                    <input
-                        type="email"
-                        id="inviteEmail"
-                        bind:value={inviteEmail}
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        placeholder="email@example.com"
-                        required
-                    />
-                </div>
-                
-                {#if inviteError}
-                    <div class="text-red-600 text-sm">{inviteError}</div>
-                {/if}
-                
-                {#if inviteSuccess}
-                    <div class="text-green-600 text-sm">{inviteSuccess}</div>
-                {/if}
-                
-                <div class="flex justify-end space-x-4">
-                    <button
-                        type="button"
-                        onclick={closeInviteModal}
-                        class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                        disabled={inviteLoading}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="submit"
-                        class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center"
-                        disabled={inviteLoading}
-                    >
-                        {#if inviteLoading}
-                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                        {/if}
-                        Send Invitation
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-    {/if}
+    
     
     <!-- Events List -->
     <div class="mt-8">
@@ -647,7 +636,7 @@
                 {#each events as event}
                     <div class="bg-white rounded-lg shadow p-6">
                         <div class="flex justify-between items-start mb-4">
-                            <h3 class="text-lg font-semibold text-gray-900">{event.event_name}</h3>
+                            <h3 class="text-xl font-bold text-gray-900">{event.title}</h3>
                                 <div class="flex space-x-2">
                                     <!-- svelte-ignore a11y_consider_explicit_label -->
                                     <!-- Edit button -->
@@ -720,17 +709,9 @@
                         </div>
                         <!-- Event Cards -->
                         <div class="space-y-2 text-sm text-gray-600">
-                            <p><span class="font-medium">Date:</span> {new Date(event.event_date).toLocaleDateString()}</p>
-                            <p><span class="font-medium">Venue:</span> {event.venue_name}</p>
-                            <p><span class="font-medium">Address:</span> {event.venue_address}</p>
-                            <p><span class="font-medium">Contact:</span> {event.sales_contact}</p>
-                            <p><span class="font-medium">Email:</span> {event.sales_email}</p>
-                            <p>
-                                <a href={event.venue_website} target="_blank" rel="noopener noreferrer" 
-                                class="text-indigo-600 hover:text-indigo-800">
-                                    Visit Website
-                                </a>
-                            </p>
+                            <p><span class="font-medium">Expected Attendance:</span> {event.expectAttend}</p>
+                            <p><span class="font-medium">Start Date:</span> {event.dates[0]}</p>
+                            <p><span class="font-medium">End Date:</span> {event.dates[event.dates.length - 1]}</p>
                         </div>
                     </div>
                 {/each}
