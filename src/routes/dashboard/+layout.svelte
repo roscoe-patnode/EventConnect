@@ -50,6 +50,7 @@
         event_manager: [
             { href: "/dashboard/event_manager/events", label: "My Events" },// Made specific event pages for roles 
             { href: "/dashboard/event_manager/calendar", label: "Calendar" },
+            { href: "/dashboard/event_manager/tickets", label: "Tickets" },
             { href: "/dashboard/chat", label: "Chat" }// Made one "reactive" chat page that changes depending on roles 
         ],
         venue_admin: [
@@ -61,6 +62,7 @@
         venue_staff: [
             { href: "/dashboard/venue_staff/tasks", label: "Tasks" },
             { href: "/dashboard/venue_staff/schedule", label: "Schedule" },
+            { href: "/dashboard/venue_staff/tickets", label: "Tickets" },
             { href: "/dashboard/venue_staff/reports", label: "Reports" }
         ]
     };
