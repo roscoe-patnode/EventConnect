@@ -14,7 +14,7 @@
     date_created: string;
     date_resolved?: string | null;
     event?: {
-      event_name: string;
+      title: string;
     };
     Profiles?: {
       first_name: string;
@@ -26,12 +26,11 @@
   let loading = true;
   let errorMsg = '';
 
-  // Fetch tickets, joining the events table and the Profiles table for the ticket owner's name.
+  // Fetch tickets, joining the Events table (pulling "title") and the Profiles table.
   async function fetchTickets() {
-    loading = true;
     const { data, error } = await supabase
       .from('Tickets')
-      .select('*, event:events (event_name), Profiles (first_name, last_name)');
+      .select('*, event:Events (title), Profiles (first_name, last_name)');
 
     console.log('Fetched tickets:', data, 'Error:', error);
 
@@ -40,7 +39,6 @@
       errorMsg = 'Error fetching tickets. Please try again later.';
     } else {
       tickets = data as Ticket[];
-      errorMsg = '';
     }
     loading = false;
   }
@@ -49,15 +47,33 @@
     fetchTickets();
   });
 
-  // Determine the border color based on ticket status.
+  // Determine the top border color based on ticket status.
   function getBorderColor(status: string) {
-    if (status === 'Pending') return '#fbbf24'; // yellow
+    if (status === 'Pending') return '#d1d5db'; // light grey
+    if (status === 'In Progress') return '#fbbf24'; // yellow
     if (status === 'Completed') return '#10b981'; // green
     return 'transparent';
   }
 
-  // Update a ticket's status to Completed and set date_resolved in the database.
-  async function markAsResolved(ticketId: string) {
+  // Update a ticket's status to In Progress (from Pending) and clear date_resolved.
+  async function takeTask(ticketId: string) {
+    const { data, error } = await supabase
+      .from('Tickets')
+      .update({ status: 'In Progress', date_resolved: null })
+      .eq('id', ticketId)
+      .select();
+
+    if (error) {
+      console.error('Error updating ticket:', error);
+      alert('Failed to take task.');
+    } else {
+      console.log('Updated ticket:', data);
+      await fetchTickets();
+    }
+  }
+
+  // Update a ticket's status to Completed and set date_resolved.
+  async function markAsCompleted(ticketId: string) {
     const resolvedDate = new Date().toISOString();
     const { data, error } = await supabase
       .from('Tickets')
@@ -66,29 +82,27 @@
       .select();
 
     if (error) {
-      console.error('Error updating ticket to Completed:', error);
-      alert('Failed to mark ticket as resolved. Check console for details.');
+      console.error('Error updating ticket:', error);
+      alert('Failed to mark ticket as completed.');
     } else {
-      console.log('Ticket updated to Completed:', data);
-      // Re-fetch tickets to ensure UI reflects changes
+      console.log('Updated ticket:', data);
       await fetchTickets();
     }
   }
 
-  // Update a ticket's status to Pending and clear date_resolved in the database.
+  // Update a ticket's status from Completed to In Progress (re-open ticket) and clear date_resolved.
   async function reopenTicket(ticketId: string) {
     const { data, error } = await supabase
       .from('Tickets')
-      .update({ status: 'Pending', date_resolved: null })
+      .update({ status: 'In Progress', date_resolved: null })
       .eq('id', ticketId)
       .select();
 
     if (error) {
-      console.error('Error updating ticket to Pending:', error);
-      alert('Failed to re-open ticket. Check console for details.');
+      console.error('Error updating ticket:', error);
+      alert('Failed to re-open ticket.');
     } else {
-      console.log('Ticket updated to Pending:', data);
-      // Re-fetch tickets to ensure UI reflects changes
+      console.log('Updated ticket:', data);
       await fetchTickets();
     }
   }
@@ -112,48 +126,56 @@
           class="bg-white rounded-lg shadow p-6 flex flex-col justify-between"
           style="border-top: 4px solid {getBorderColor(ticket.status)}"
         >
-          <div>
-            <div class="flex justify-between items-start mb-4">
-              <h3 class="text-lg font-semibold text-gray-900">
-                {ticket.event ? ticket.event.event_name : ticket.event_id}
-              </h3>
-            </div>
-            <div class="space-y-2 text-sm text-gray-600">
-              <p>
-                <span class="font-medium">Ticket Owner:</span>
-                {ticket.Profiles ? `${ticket.Profiles.first_name} ${ticket.Profiles.last_name}` : ticket.ticket_owner}
-              </p>
-              <p>
-                <span class="font-medium">Service:</span> {ticket.service}
-              </p>
-              <p>
-                <span class="font-medium">Priority:</span> {ticket.priority}
-              </p>
-              <p>
-                <span class="font-medium">Status:</span> {ticket.status}
-              </p>
-              <p>
-                <span class="font-medium">Submitted:</span> {new Date(ticket.date_created).toLocaleDateString()}
-              </p>
-              {#if ticket.date_resolved}
-                <p>
-                  <span class="font-medium">Resolved:</span> {new Date(ticket.date_resolved).toLocaleDateString()}
-                </p>
-              {/if}
-              <p>
-                <span class="font-medium">Description:</span> {ticket.description}
-              </p>
+          <!-- Card Header: Event Title and Status -->
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">
+              {ticket.event ? ticket.event.title : ticket.event_id}
+            </h3>
+            <div class="text-xs text-gray-500 text-right">
+              {ticket.status}
             </div>
           </div>
+          <!-- Card Content -->
+          <div class="space-y-2 text-sm text-gray-600">
+            <p>
+              <span class="font-medium">Ticket Owner:</span>
+              {ticket.Profiles ? `${ticket.Profiles.first_name} ${ticket.Profiles.last_name}` : ticket.ticket_owner}
+            </p>
+            <p>
+              <span class="font-medium">Service:</span> {ticket.service}
+            </p>
+            <p>
+              <span class="font-medium">Description:</span> {ticket.description}
+            </p>
+            <p>
+              <span class="font-medium">Submitted:</span> {new Date(ticket.date_created).toLocaleDateString()}
+            </p>
+            {#if ticket.date_resolved}
+              <p>
+                <span class="font-medium">Resolved:</span> {new Date(ticket.date_resolved).toLocaleDateString()}
+              </p>
+            {/if}
+            <p>
+              <span class="font-medium">Priority:</span> {ticket.priority}
+            </p>
+          </div>
+          <!-- Card Action Button -->
           <div>
-            {#if ticket.status !== 'Completed'}
+            {#if ticket.status === 'Pending'}
               <button 
-                on:click={() => markAsResolved(ticket.id)}
-                class="mt-4 w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+                on:click={() => takeTask(ticket.id)}
+                class="mt-4 w-full px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors"
               >
-                Mark as Resolved
+                Take Task
               </button>
-            {:else}
+            {:else if ticket.status === 'In Progress'}
+              <button 
+                on:click={() => markAsCompleted(ticket.id)}
+                class="mt-4 w-full px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors"
+              >
+                Mark as Completed
+              </button>
+            {:else if ticket.status === 'Completed'}
               <button 
                 on:click={() => reopenTicket(ticket.id)}
                 class="mt-4 w-full px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors"
