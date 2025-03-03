@@ -21,6 +21,7 @@
       event_id: string;
       event: {
         title: string;
+        venue_id: string; // assumed to be present so we can lookup the venue
       };
     }
   
@@ -29,6 +30,9 @@
     let service = '';
     let priority = 'Medium';
     let description = '';
+  
+    // Reactive array for service options from the venue
+    let serviceOptions: string[] = [];
   
     let currentUserId = '';
   
@@ -43,12 +47,12 @@
     }
   
     // Fetch events for the current user from the EventManagerEventsList table,
-    // joining with the uppercase "Events" table to get the event title.
+    // joining with the uppercase "Events" table to get the event title and venue_id.
     async function fetchUserEvents() {
       if (!currentUserId) return;
       const { data, error } = await supabase
         .from('EventManagerEventsList')
-        .select('event_id, event:Events(title)')
+        .select('event_id, event:Events(title, venue_id)')
         .eq('event_manager_id', currentUserId);
   
       if (error) {
@@ -59,6 +63,40 @@
           selectedEventId = events[0].event_id;
         }
       }
+    }
+  
+    // When the selected event changes, fetch the corresponding services from the venue.
+    async function fetchServicesForEvent(eventId: string) {
+      // Find the event record from our events array.
+      const managerEvent = events.find(e => e.event_id === eventId);
+      if (!managerEvent) {
+        serviceOptions = [];
+        return;
+      }
+      const venueId = managerEvent.event.venue_id;
+      // Query the Venues table for the services array.
+      const { data, error } = await supabase
+        .from('Venues')
+        .select('services')
+        .eq('id', venueId)
+        .single();
+  
+      if (error) {
+        console.error('Error fetching venue services:', error);
+        serviceOptions = [];
+      } else {
+        // Assuming data.services is a text[] column.
+        serviceOptions = data.services || [];
+        // If there are options, set service to the first one (or clear if needed)
+        if (serviceOptions.length > 0 && !service) {
+          service = serviceOptions[0];
+        }
+      }
+    }
+  
+    // Reactive block: When selectedEventId changes, fetch its service options.
+    $: if (selectedEventId) {
+      fetchServicesForEvent(selectedEventId);
     }
   
     // Create a new ticket and then redirect to the tickets page.
@@ -87,7 +125,11 @@
       } else {
         console.log('Ticket created successfully:', data);
         alert('Ticket created!');
-        // Redirect to the previous tickets page
+        // Optionally, reset form fields
+        service = '';
+        priority = 'Medium';
+        description = '';
+        // Redirect to the tickets page after creation
         goto('/dashboard/event_manager/tickets');
       }
     }
@@ -98,7 +140,7 @@
     });
   </script>
   
-  <div class="max-w-7xl mx-auto px-4 py-8">
+  <div class="max-w-2xl mx-auto px-4 py-8">
     <h1 class="text-3xl font-bold text-gray-900 mb-8">Submit a Service Request</h1>
     <form on:submit|preventDefault={createTicket} class="space-y-6">
       <div>
@@ -116,14 +158,20 @@
   
       <div>
         <label for="service" class="block text-sm font-medium text-gray-700">Service Type:</label>
-        <input
+        <!-- Instead of a text input, use a dropdown populated with options from the venue's services -->
+        <select
           id="service"
-          type="text"
           bind:value={service}
-          placeholder="e.g., Lighting, Catering"
-          required
           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-        />
+        >
+          {#if serviceOptions.length > 0}
+            {#each serviceOptions as option}
+              <option value={option}>{option}</option>
+            {/each}
+          {:else}
+            <option value="">No services available</option>
+          {/if}
+        </select>
       </div>
   
       <div>
