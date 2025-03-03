@@ -54,7 +54,7 @@
             { href: "/dashboard/chat", label: "Chat" }// Made one "reactive" chat page that changes depending on roles 
         ],
         venue_admin: [
-            { href: "/dashboard/venue_admin/events", label: "My Venues" },
+            { href: "/dashboard/venue_admin/venue", label: "My Venue" },
             { href: "/dashboard/venue_admin/events", label: "My Events" },
             { href: "/dashboard/venue_admin/calendar", label: "Calendar" },
             { href: "/dashboard/chat", label: "Chat" }
@@ -80,7 +80,7 @@
                         <span class="text-xl font-bold text-indigo-600">
                             {#if userRole}
                                 {userRole === 'event_manager' ? 'Event Dashboard' :
-                                 userRole === 'venue_admin' ? 'Facility Dashboard' :
+                                 userRole === 'venue_admin' ? 'Administrator Dashboard' :
                                  'Staff Dashboard'}
                             {:else}
                                 Dashboard

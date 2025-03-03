@@ -1,7 +1,7 @@
 <script lang="ts">
     import { supabase } from '$lib/supabaseClient';
     import { goto } from '$app/navigation';
-
+    
     let pageState = $state("LogIn")
     let loading = false;
     let firstName = '';

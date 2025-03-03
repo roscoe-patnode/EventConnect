@@ -17,8 +17,7 @@
     let eventStartDate = $state('');
     let eventEndDate = $state('');
     let eventVenueId = $state('');
-    let eventEventSpace = $state('');
-    let eventSpaceSetup = $state('');
+
 
 
     // Collab invite vars
@@ -710,8 +709,12 @@
                         <!-- Event Cards -->
                         <div class="space-y-2 text-sm text-gray-600">
                             <p><span class="font-medium">Expected Attendance:</span> {event.expectAttend}</p>
-                            <p><span class="font-medium">Start Date:</span> {event.dates[0]}</p>
-                            <p><span class="font-medium">End Date:</span> {event.dates[event.dates.length - 1]}</p>
+                            <p><span class="font-medium">Start Date:</span> {#if event.dates}
+                                {event.dates[0]}
+                            {/if}</p>
+                            <p><span class="font-medium">End Date:</span> {#if event.dates}
+                                {event.dates[event.dates.length - 1]}
+                            {/if}</p>
                         </div>
                     </div>
                 {/each}
