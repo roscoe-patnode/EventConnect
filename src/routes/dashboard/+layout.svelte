@@ -21,19 +21,29 @@
 
                 if (error) throw error;
                 userRole = profileData.role;
+                
+                // Updated redirection logic:
+                const currentPath = window.location.pathname;
+                if (userRole === 'event_manager' && (currentPath === '/dashboard' || currentPath === '/dashboard/event_manager')) {
+                    goto('/dashboard/event_manager/events');
+                } else if (userRole === 'venue_admin' && (currentPath === '/dashboard' || currentPath === '/dashboard/venue_admin')) {
+                    goto('/dashboard/venue_admin/venue');
+                } else if (userRole === 'venue_staff' && (currentPath === '/dashboard' || currentPath === '/dashboard/venue_staff')) {
+                    goto('/dashboard/venue_staff/tickets');
+                }
             } else {
                 // No user is signed in, redirect to home page
                 goto('/');
-                
-        }
+            }
         } catch (error) {
             console.error('Error fetching user role:', error);
             goto('/');
-            
         } finally {
             loading = false;
         }
     });
+
+
 
     async function handleSignOut() {
         try {
@@ -49,7 +59,6 @@
     const navItems:any = {
         event_manager: [
             { href: "/dashboard/event_manager/events", label: "My Events" },// Made specific event pages for roles 
-            { href: "/dashboard/event_manager/calendar", label: "Calendar" },
             { href: "/dashboard/event_manager/tickets", label: "Tickets" },
             { href: "/dashboard/chat", label: "Chat" }// Made one "reactive" chat page that changes depending on roles 
         ],
@@ -57,13 +66,12 @@
             { href: "/dashboard/venue_admin/venue", label: "My Venue" },
             { href: "/dashboard/venue_admin/events", label: "My Events" },
             { href: "/dashboard/venue_admin/calendar", label: "Calendar" },
+            { href: "/dashboard/venue_admin/reports", label: "Reports" },
             { href: "/dashboard/chat", label: "Chat" }
         ],
         venue_staff: [
-            { href: "/dashboard/venue_staff/tasks", label: "Tasks" },
             { href: "/dashboard/venue_staff/schedule", label: "Schedule" },
             { href: "/dashboard/venue_staff/tickets", label: "Tickets" },
-            { href: "/dashboard/venue_staff/reports", label: "Reports" }
         ]
     };
 
@@ -76,18 +84,30 @@
             <div class="flex justify-between items-center h-16">
                 <!-- Logo side -->
                 <div class="flex-shrink-0">
-                    <a href="/" class="flex items-center">
-                        <span class="text-xl font-bold text-indigo-600">
-                            {#if userRole}
-                                {userRole === 'event_manager' ? 'Event Dashboard' :
-                                 userRole === 'venue_admin' ? 'Administrator Dashboard' :
-                                 'Staff Dashboard'}
-                            {:else}
-                                Dashboard
-                            {/if}
-                        </span>
+                    <a 
+                      href={
+                        userRole === 'event_manager' 
+                          ? '/dashboard/event_manager/events' 
+                          : userRole === 'venue_admin'
+                            ? '/dashboard/venue_admin/venue'
+                            : userRole === 'venue_staff'
+                              ? '/dashboard/venue_staff/tickets'
+                              : '/dashboard'
+                      }
+                      class="flex items-center"
+                    >
+                      <span class="text-xl font-bold text-indigo-600">
+                        {#if userRole}
+                          {userRole === 'event_manager' ? 'Event Dashboard' :
+                           userRole === 'venue_admin' ? 'Administrator Dashboard' :
+                           'Staff Dashboard'}
+                        {:else}
+                          Dashboard
+                        {/if}
+                      </span>
                     </a>
-                </div>
+                  </div>
+                  
 
                 <!-- Navigation side -->
                 <div>

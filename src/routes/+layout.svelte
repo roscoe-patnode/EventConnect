@@ -37,7 +37,6 @@
 			<div class="flex items-center space-x-6">
 			  <a href="/LogInSignUp" class="px-3 py-2 rounded-md text-sm font-medium text-indigo-600 hover:bg-indigo-50 transition-colors">Login/SignUp</a>
 			  <a href="/AboutUs" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">About us</a>
-			  <a href="/Pricing" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">Pricing</a>
 			</div>
 		  </div>
 		</div>
