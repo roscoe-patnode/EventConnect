@@ -55,6 +55,11 @@
         }
     }
 
+    async function goProfile() {
+        goto('/profile')
+    }
+
+
     // Navigation items based on role
     const navItems:any = {
         event_manager: [
@@ -128,7 +133,7 @@
                             <!-- User menu and logout -->
                             <div class="flex items-center space-x-4">
                                 <a 
-                                    href="/profile" 
+                                    href="/dashboard/profile"
                                     class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
                                 >
                                     Profile
