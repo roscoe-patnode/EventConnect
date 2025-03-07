@@ -18,7 +18,7 @@
 	  };
 	});
   </script>
-
+  
   {#if page.route.id?.startsWith("/dashboard") === false}
   <div class="min-h-screen flex flex-col">
 	<!-- Static Navbar (not fixed) -->
@@ -28,7 +28,8 @@
 		  <!-- Logo -->
 		  <div class="flex-shrink-0">
 			<a href="/" class="flex items-center">
-			  <span class="text-xl font-bold text-indigo-600">Logo</span>
+			  <!-- Replace with your logo image -->
+			  <img src="/vtm-logo_1.jpg" alt="Logo" class="h-8 w-auto">
 			</a>
 		  </div>
 		  
@@ -48,6 +49,7 @@
 	  {@render children()}
 	</main>
   </div>
-{:else}
+  {:else}
 	{@render children()}
-{/if}
+  {/if}
+  
