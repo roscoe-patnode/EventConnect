@@ -2,6 +2,29 @@
   import { supabase } from '$lib/supabaseClient';
   import { onMount } from 'svelte';
 
+
+    class Venue {
+        id = "";
+        name = "";
+        address = "";
+        phone = "";
+        website = "";
+        totalSpace = 0;
+        services:string[] = [];
+
+        constructor(id:string, name:string, address:string, phone:string, website:string, totalSpace:number, services:string[]) {
+            this.id = id;
+            this.name = name;
+            this.address = address;
+            this.phone = phone;
+            this.website = website;
+            this.totalSpace = totalSpace;
+            this.services = services;
+        }
+    }
+    let venue:Venue = $state(new Venue("", "", "", "", "", 0, []));
+    let showSelectVenue = $state(false);
+    let selectVenueId = $state('');
   // Define the interface for a Ticket record, including joined event and profile data.
   interface Ticket {
     id: string;
@@ -22,15 +45,80 @@
     };
   }
 
-  let tickets: Ticket[] = [];
-  let loading = true;
+  let tickets: Ticket[] = $state([]);
+  let loading = $state(true);
   let errorMsg = '';
+
+    async function fetchVenue() {
+        let hasVenue = false;
+        try {
+            const {data, error} = await supabase
+                .from('VenueStaff')
+                .select('*');
+            if (error) throw error;
+            console.log(data);
+            if(data.length > 0) {
+                hasVenue = true;
+                const { data: venueData, error: venueError } = await supabase
+                    .from('Venues')
+                    .select('*')
+                    .eq('id', data[0].venue_id);
+                if (venueError) throw venueError;
+                venue = new Venue(venueData![0].id, venueData![0].name, venueData![0].address, venueData![0].phone, venueData![0].website, venueData![0].total_space, venueData![0].services);
+            }
+        } catch (error) {
+            console.error("Error fetching Venues", error);
+        }
+        if(!hasVenue) {
+            showSelectVenue = true;
+        }
+    }
+    async function handleSelectVenue() {
+        try {
+            const { data: venueData, error: venueError } = await supabase
+                .from('Venues')
+                .select('*')
+                .eq('id', selectVenueId);
+            if (venueError) throw venueError;
+            if (venueData.length === 0)
+                return;
+            else {
+                venue = new Venue(venueData![0].id, venueData![0].name, venueData![0].address, venueData![0].phone, venueData![0].website, venueData![0].total_space, venueData![0].services);
+                const { data: userData } = await supabase.auth.getUser();
+                try {
+                    const { error } = await supabase
+                        .from("VenueStaff")
+                        .insert([
+                            {
+                                id: userData.user!.id,
+                                venue_id: selectVenueId
+                            }
+                        ])
+                        selectVenueId = "";
+                        if (error) throw error;
+                        await fetchTickets();
+                        tickets = [...tickets];
+                        console.log("Updating tickets");
+                        showSelectVenue = false;
+                        
+                } catch (error) {
+                    console.error ("Error assigning Venue:", error);
+                }
+            }
+        } catch (error) {
+            console.error("Error select Venue from given ID:", error);
+        }
+    }
+
 
   // Fetch tickets, joining the Events table (pulling "title") and the Profiles table.
   async function fetchTickets() {
+    const { data: userData } = await supabase.auth.getUser();
     const { data, error } = await supabase
-      .from('Tickets')
-      .select('*, event:Events (title), Profiles (first_name, last_name)');
+      .from('venue_staff_access_tickets')
+      .select('*')
+      .eq('staff_id', userData.user!.id);
+    console.log(data);
 
     console.log('Fetched tickets:', data, 'Error:', error);
 
@@ -38,12 +126,21 @@
       console.error('Error fetching tickets:', error);
       errorMsg = 'Error fetching tickets. Please try again later.';
     } else {
-      tickets = data as Ticket[];
+      let formattedData = data.map( row => ({
+        ...row,
+        event: {title: row.title},
+        Profiles: {
+            first_name: row.first_name,
+            last_name: row.last_name
+        }
+      }))
+      tickets = formattedData as Ticket[];
     }
     loading = false;
   }
 
   onMount(() => {
+    fetchVenue();
     fetchTickets();
   });
 
@@ -108,6 +205,62 @@
   }
 </script>
 
+{#if showSelectVenue}
+<div class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-semibold text-gray-900">Enter Venue ID</h2>
+        </div>
+        
+        <form onsubmit={handleSelectVenue} class="space-y-6">
+
+            <div>
+                <label for="selectVenueId" class="block text-sm font-medium text-gray-700">Enter the Venue ID given to you by the Venue Admin</label>
+                <input
+                    type ="text"
+                    id="removeServiceName"
+                    bind:value={selectVenueId}
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    required
+                />
+            </div>
+                    <div class="flex justify-end space-x-4">
+                        <button
+                            type="submit"
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                            Submit
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+{/if}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-900">Venue</h1>
+    </div>
+    <div class="bg-white shadow-lg rounded-lg p-6 max-w-md w-full">
+        <h3 class="text-xl font-bold text-gray-900 mb-4">{venue.name}</h3>
+        <div class="space-y-2 text-gray-700">
+            <p><span class="font-semibold">Address:</span> {venue.address}</p>
+            <p><span class="font-semibold">Phone:</span> {venue.phone}</p>
+            <p><span class="font-semibold">Website:</span> <a target="_blank" href="{venue.website}" class="text-blue-600 hover:underline">{venue.website}</a></p>
+            <p><span class="font-semibold">Total Space (ft²):</span> {venue.totalSpace}</p>
+            <div class="flex-col items-center">
+            <h1 class="text-xl font-semibold text-gray-800">Services</h1>
+            <div class="flex flex-wrap gap-2 text-gray-700 mt-2">
+                {#each venue.services as service}
+                    <p><span class="font-semibold bg-gray-200 text-gray-900 px-3 py-1 rounded-lg text-sm">{service}</span></p>
+                {/each}
+            </div>
+        </div>
+        </div>
+    </div>
+</div>
+
+
+
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
   <h1 class="text-3xl font-bold text-gray-900 mb-8">Service Request Tickets (Venue Staff)</h1>
 
@@ -163,21 +316,21 @@
           <div>
             {#if ticket.status === 'Pending'}
               <button 
-                on:click={() => takeTask(ticket.id)}
+                onclick={() => takeTask(ticket.id)}
                 class="mt-4 w-full px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors"
               >
                 Take Task
               </button>
             {:else if ticket.status === 'In Progress'}
               <button 
-                on:click={() => markAsCompleted(ticket.id)}
+                onclick={() => markAsCompleted(ticket.id)}
                 class="mt-4 w-full px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors"
               >
                 Mark as Completed
               </button>
             {:else if ticket.status === 'Completed'}
               <button 
-                on:click={() => reopenTicket(ticket.id)}
+                onclick={() => reopenTicket(ticket.id)}
                 class="mt-4 w-full px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors"
               >
                 Re-open Ticket
