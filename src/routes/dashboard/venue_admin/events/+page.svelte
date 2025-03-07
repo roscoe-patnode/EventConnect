@@ -16,7 +16,8 @@
     let eventExpectAttend = $state(0);
     let eventStartDate = $state('');
     let eventEndDate = $state('');
-    let eventVenueId = $state('');
+    let eventEventSpaceId = $state('');
+    let eventSpaceSetup = $state('');
 
 
 
@@ -56,6 +57,7 @@
         size = 0;
         ceilings = 0;
         spaceSetups = new Map();
+        currentSetup:Record<string, number> = {};
 
         constructor(id:string, name:string, size:number, ceilings:number) {
             this.id = id;
@@ -67,29 +69,34 @@
     class Event {
         id = "";
         title = "";
-        dates = [];
+        dates:string[] = [];
         expectAttend = 0;
         bookedSpaces:any = [];
 
-        constructor(id:string, title:string, dates:[], expectAttend:number) {
+        constructor(id:string, title:string, dates:string[], expectAttend:number, bookedSpaces?:any[]) {
             this.id = id;
             this.title = title;
             this.dates = dates;
             this.expectAttend = expectAttend;
+            if (bookedSpaces) {
+                this.bookedSpaces = bookedSpaces;
+            }
         }
     }
     // Venues array
     let venues:any = $state([]);
     // Events array
-    let events:any = $state([]);
+    let events:Event[] = $state([]);
     // All event spaces
     let allEventSpaces = new Map();
 
     async function fetchVenues() {
         try {
+            const { data: userData } = await supabase.auth.getUser();
             const {data, error} = await supabase
                 .from('Venues')
-                .select('*');
+                .select('*')
+                .eq('venue_admin_id', userData.user!.id);
             if (error) throw error;
             for (const row of data) {
                 venues.push(new Venue(row.id, row.name, row.address, row.phone, row.website, row.total_space, row.services));
@@ -152,18 +159,32 @@
                 .from('BookedEventSpacesList')
                 .select('*');
             if (error) throw error;
-            for (const row of data) {
-                if (error) throw error;
-                for (const row of data) {
-                    for (const e of events) {
-                        if (e.id = row.event_id) {
-                            e.bookedSpaces.push(allEventSpaces.get(row.event_space_id))
-                            break;
+            events = events.map((e:Event) => {
+                const matchedRows = data.filter(row => row.event_id === e.id);
+
+                if (matchedRows.length > 0) {
+                    let updatedBookedSpaces = [...e.bookedSpaces];
+
+                    for (const row of matchedRows) {
+                        let space = allEventSpaces.get(row.event_space_id);
+                        if (space) {
+                            let newSpace = {
+                                ...space,
+                                currentSetup: { 
+                                    string: row.setup, 
+                                    number: space.spaceSetups.get(row.setup) 
+                                }
+                            };
+                            updatedBookedSpaces.push(newSpace);
                         }
                     }
-                }
+
+                    // Replace the entire event object in the array
+                    return new Event(e.id, e.title, e.dates, e.expectAttend, updatedBookedSpaces);
             }
-            
+            return e;
+        });
+            events = [...events]
         } catch (error) {
             console.error("Error fetching Event Spaces", error)
         }
@@ -177,13 +198,9 @@
     });
     
     async function handleCreateEvent(e: SubmitEvent) {
+        let newEvent:Event;
         e.preventDefault();
         try {
-            // Get the current user
-            const { data: { user } } = await supabase.auth.getUser();
-            
-            if (!user) throw new Error('User not authenticated');
-            console.log(user)
             const arrDates = [];
             for(const dt=new Date(eventStartDate); dt<=new Date(eventEndDate); dt.setDate(dt.getDate()+1)){
                 arrDates.push(new Date(dt));
@@ -197,20 +214,43 @@
                         title: eventTitle,
                         dates: arrDates,
                         expect_attend: eventExpectAttend,
-                        venue_id: eventVenueId
+                        venue_id: venues[0].id
                     }
                 ])
                 .select('*');
-
+            
             if (error) throw error;
             // Add new event to local state
-            events = [...events, data[0]];
-            resetEventForm();
+            newEvent = new Event(data[0].id, data[0].title, data[0].dates, data[0].expect_attend);
+            try {
+                const { data: spaceData, error: spaceError } = await supabase
+                    .from("BookedEventSpacesList")
+                    .insert([
+                        {
+                            event_space_id: eventEventSpaceId,
+                            event_id: newEvent.id,
+                            setup: eventSpaceSetup
+                        }
+                    ])
+                if (error) throw error;
+                let bookedSpace = allEventSpaces.get(eventEventSpaceId);
+                bookedSpace = {
+                    ...bookedSpace,
+                    currentSetup: {
+                        string: eventSpaceSetup,
+                        number: bookedSpace.spaceSetups.get(eventSpaceSetup)}
+                };
+                newEvent.bookedSpaces = [...newEvent.bookedSpaces, bookedSpace]
+                newEvent = new Event(newEvent.id, newEvent.title, newEvent.dates, newEvent.expectAttend, newEvent.bookedSpaces);
+                events = [...events, newEvent];
+            } catch (error) {
+                console.error("Error booking Event Space:", error);
+            }
 
         } catch (error) {
             console.error('Error creating event:', error);
         }
-        
+        resetEventForm();
     }
     
     function resetEventForm() {
@@ -218,6 +258,9 @@
         eventExpectAttend = 0;
         eventStartDate = '';
         eventEndDate = '';
+        eventEventSpaceId = '';
+        eventSpaceSetup = '';
+
         showCreateEventForm = false;
     }
 
@@ -252,7 +295,8 @@
     // Function to close edit modal
     function closeEditModal() {
         currentEvent = null;
-        eventVenueId = "";
+        eventEventSpaceId = '';
+        eventSpaceSetup = '';
         showEditForm = false;
     }
 
@@ -271,17 +315,79 @@
                     title: currentEvent.title,
                     expect_attend: currentEvent.expectAttend,
                     dates: arrDates,
-                    venue_id: eventVenueId
+                    venue_id: venues[0].id
                 })
                 .eq('id', currentEvent.id);
 
             if (error) throw error;
+            
+            try {
+                const { error: deleteError } = await supabase
+                    .from("BookedEventSpacesList")
+                    .delete()
+                    .eq("event_id", currentEvent.id);
+                if (deleteError) throw error;
+            } catch (error) {
+                console.error("Error deleting old Event Space:", error);
+            }
 
-            // Update the event in local state (on UI)
-            events = events.map((event: any) => 
-                event.id === currentEvent.id ? currentEvent : event
-            );
-
+            if (!eventEventSpaceId) {
+                try {
+                    
+                    const { data: spaceData, error: spaceError } = await supabase
+                        .from("BookedEventSpacesList")
+                        .insert([
+                            {
+                                event_space_id: currentEvent.bookedSpaces[0].id,
+                                event_id: currentEvent.id,
+                                setup: currentEvent.bookedSpaces[0].currentSetup.string
+                            }
+                        ])
+                    if (spaceError) throw error;
+                    let bookedSpace = currentEvent.bookedSpaces[0];
+                    bookedSpace = {
+                        ...bookedSpace,
+                        currentSetup: {
+                            string: currentEvent.bookedSpaces[0].currentSetup.string,
+                            number: currentEvent.bookedSpaces[0].currentSetup.number
+                        }
+                    };
+                    currentEvent.bookedSpaces = [bookedSpace]
+                    // Update the event in local state (on UI)
+                    events = events.map((event: any) => 
+                        event.id === currentEvent.id ? currentEvent : event
+                    );
+                } catch (error) {
+                    console.error("Error updating booked Event Space:", error);
+                }
+            }
+            else {
+                try {
+                    const { data: spaceData, error: spaceError } = await supabase
+                        .from("BookedEventSpacesList")
+                        .insert([
+                            {
+                                event_space_id: eventEventSpaceId,
+                                event_id: currentEvent.id,
+                                setup: eventSpaceSetup
+                            }
+                        ])
+                    if (error) throw error;
+                    let bookedSpace = allEventSpaces.get(eventEventSpaceId);
+                    bookedSpace = {
+                        ...bookedSpace,
+                        currentSetup: {
+                            string: eventSpaceSetup,
+                            number: bookedSpace.spaceSetups.get(eventSpaceSetup)}
+                    };
+                    currentEvent.bookedSpaces = [bookedSpace]
+                    events = events.map((event: any) => 
+                            event.id === currentEvent.id ? currentEvent : event
+                    );
+                } catch (error) {
+                    console.error("Error updating booked Event Space:", error);
+                }
+            }
             closeEditModal();
 
         } catch (error) {
@@ -492,18 +598,33 @@
                     </div>
 
                     <div>
-                        <label for="eventVenueId" class="block text-sm font-medium text-gray-700">Venue</label>
+                        <label for="eventSpaceId" class="block text-sm font-medium text-gray-700">Event Space</label>
                         <select
-                            id="eventVenueId"
-                            bind:value={eventVenueId}
+                            id="eventSpaceId"
+                            bind:value={eventEventSpaceId}
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             required
                         >
-                        {#each venues as venue}
-                        <option value={venue.id}>{venue.name}</option>
+                        {#each allEventSpaces.entries() as [eventSpaceId, eventSpace] }
+                        <option value={ eventSpaceId }>{eventSpace.name}</option>
                         {/each}
                         </select>
                     </div>
+                    {#if eventEventSpaceId}
+                    <div>
+                        <label for="spaceSetup" class="block text-sm font-medium text-gray-700">Event Space</label>
+                        <select
+                            id="spaceSetup"
+                            bind:value={eventSpaceSetup}
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            required
+                        >
+                        {#each allEventSpaces.get(eventEventSpaceId).spaceSetups.entries() as [eventSetupName, eventSetupCapacity] }
+                        <option value={ eventSetupName }>{eventSetupName} | {eventSetupCapacity}</option>
+                        {/each}
+                        </select>
+                    </div>
+                    {/if}
                     
                     <div class="flex justify-end space-x-4">
                         <button
@@ -588,19 +709,64 @@
                         />
                     </div>
 
+                    {#if currentEvent.bookedSpaces[0]}
                     <div>
-                        <label for="editEventVenueId" class="block text-sm font-medium text-gray-700">Venue</label>
+                        <label for="editEventSpace" class="block text-sm font-medium text-gray-700">Event Space</label>
                         <select
-                            id="editEventVenueId"
-                            bind:value={eventVenueId}
+                            id="editEventSpace"
+                            bind:value={currentEvent.bookedSpaces[0]}
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             required
                         >
-                        {#each venues as venue}
-                        <option value={venue.id}>{venue.name}</option>
+                        {#each allEventSpaces.entries() as [eventSpaceId, eventSpace] }
+                        <option value={ eventSpace }>{eventSpace.name}</option>
                         {/each}
                         </select>
                     </div>
+                    
+                    <div>
+                        <label for="editSpaceSetup" class="block text-sm font-medium text-gray-700">Event Space</label>
+                        <select
+                            id="editSpaceSetup"
+                            bind:value={currentEvent.bookedSpaces[0].currentSetup}
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            required
+                        >
+                        {#each allEventSpaces.get(currentEvent.bookedSpaces[0].id).spaceSetups.entries() as [eventSetupName, eventSetupCapacity] }
+                        <option value={ {string: eventSetupName, number: eventSetupCapacity} }>{eventSetupName} | {eventSetupCapacity}</option>
+                        {/each}
+                        </select>
+                    </div>
+                    {:else}
+                    <div>
+                        <label for="eventSpaceId" class="block text-sm font-medium text-gray-700">Event Space</label>
+                        <select
+                            id="eventSpaceId"
+                            bind:value={eventEventSpaceId}
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            required
+                        >
+                        {#each allEventSpaces.entries() as [eventSpaceId, eventSpace] }
+                        <option value={ eventSpaceId }>{eventSpace.name}</option>
+                        {/each}
+                        </select>
+                    </div>
+                    {#if eventEventSpaceId}
+                    <div>
+                        <label for="spaceSetup" class="block text-sm font-medium text-gray-700">Event Space</label>
+                        <select
+                            id="spaceSetup"
+                            bind:value={eventSpaceSetup}
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            required
+                        >
+                        {#each allEventSpaces.get(eventEventSpaceId).spaceSetups.entries() as [eventSetupName, eventSetupCapacity] }
+                        <option value={ eventSetupName }>{eventSetupName} | {eventSetupCapacity}</option>
+                        {/each}
+                        </select>
+                    </div>
+                    {/if}
+                    {/if}
                     
                     <div class="flex justify-end space-x-4">
                         <button
@@ -715,6 +881,13 @@
                             <p><span class="font-medium">End Date:</span> {#if event.dates}
                                 {event.dates[event.dates.length - 1]}
                             {/if}</p>
+                            {console.log(event.bookedSpaces)}
+                            {console.log(event.bookedSpaces.length)}
+                            {#if event.bookedSpaces.length > 0}
+                                <p><span class="font-medium">Booked Event Space</span> {event.bookedSpaces[0].name}</p>
+                                <p><span class="font-medium">Event Space Setup</span> {event.bookedSpaces[0].currentSetup.string} | {event.bookedSpaces[0].currentSetup.number}</p>
+                            {/if}
+                            {console.log(event)}
                         </div>
                     </div>
                 {/each}

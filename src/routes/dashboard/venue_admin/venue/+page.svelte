@@ -79,14 +79,17 @@
     async function fetchVenue() {
         let hasVenue = false;
         try {
+            const { data: userData } = await supabase.auth.getUser();
             const {data, error} = await supabase
                 .from('Venues')
-                .select('*');
+                .select('*')
+                .eq('venue_admin_id', userData.user!.id);
             if (error) throw error;
             if(data.length > 0) {
-                hasVenue = true
+                hasVenue = true;
                 venue = new Venue(data[0].id, data[0].name, data[0].address, data[0].phone, data[0].website, data[0].total_space, data[0].services);
             }
+            console.log(hasVenue);
         } catch (error) {
             console.error("Error fetching Venues", error);
         }
@@ -153,7 +156,7 @@
     
 
     async function handleEditVenue() {
-        if (editVenue.website.substring(0,6) != "http://" && editVenue.website.substring(0,7) != "https://") {
+        if (editVenue.website.substring(0,7) != "http://" && editVenue.website.substring(0,8) != "https://") {
             editVenue.website = "https://" + editVenue.website;
         }
         try {
