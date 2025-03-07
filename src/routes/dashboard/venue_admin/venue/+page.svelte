@@ -11,6 +11,7 @@
     let showAddServiceForm = $state(false);
     let showRemoveServiceForm = $state(false);
     let serviceName = $state("");
+    let newServiceName = $state("");
 
     // Create EventSpace and SpaceSetup form variables
     let showCreateEventSpaceForm = $state(false);
@@ -75,6 +76,7 @@
     // All event spaces
     let eventSpaces = $state(new Map());
 
+    let suggestedService = [ "Food & Beverage", "Audio/Visual", "Support Staff", "Furniture Rentals", "Off-Site Vendors", "Event Planning Services" ];
 
     async function fetchVenue() {
         let hasVenue = false;
@@ -180,8 +182,15 @@
         closeVenueForm();
     }
 
-    async function handleAddService(serviceName:string) {
-        venue.services = [... venue.services, serviceName];
+    async function handleAddService() {
+        if (serviceName != "other") {
+            newServiceName = serviceName;
+        }
+        if (venue.services.includes(newServiceName)) {
+            alert("Cannot add service \"" + newServiceName + "\" because it already exists!")
+            return;
+        }
+        venue.services = [... venue.services, newServiceName];
         try {
             const { error } = await supabase
                 .from('Venues')
@@ -193,7 +202,7 @@
             .eq('id', venue.id);
             if (error) throw error
         } catch (error) {
-            venue.services = venue.services.filter((service:string) => service !== serviceName);
+            venue.services = venue.services.filter((service:string) => service !== newServiceName);
             console.error("Error adding service:", error);
         }
         venue = { ...venue};
@@ -335,6 +344,7 @@
 
     async function closeAddServiceForm() {
         serviceName = "";
+        newServiceName = "";
         showAddServiceForm = false;
     }
     async function closeRemoveServiceForm() {
@@ -558,17 +568,34 @@
                     </button>
                 </div>
                 
-                <form onsubmit={() => handleAddService(serviceName)} class="space-y-6">
+                <form onsubmit={handleAddService} class="space-y-6">
+
                     <div>
-                        <label for="serviceName" class="block text-sm font-medium text-gray-700">Service Name</label>
+                        <label for="removeServiceName" class="block text-sm font-medium text-gray-700">Suggested Service Name</label>
+                        <select
+                            id="removeServiceName"
+                            bind:value={serviceName}
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            required
+                        >
+                        {#each suggestedService as service}
+                            <option value={service}>{service}</option>
+                        {/each}
+                            <option value="other">other</option>
+                        </select>
+                    </div>
+                    {#if serviceName === "other"}
+                    <div>
+                        <label for="serviceName" class="block text-sm font-medium text-gray-700">Other Service Name</label>
                         <input
                             type="text"
                             id="serviceName"
-                            bind:value={serviceName}
+                            bind:value={newServiceName}
                             class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             required
                         />
                     </div>
+                    {/if}
                     
 
                     <div class="flex justify-end space-x-4">
