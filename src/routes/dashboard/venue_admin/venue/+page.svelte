@@ -9,6 +9,7 @@
 
     // Edit Venue information form
     let showEditVenueForm = $state(false);
+    let showVenueId = $state(false);
 
     // Service form
     let showAddServiceForm = $state(false);
@@ -524,6 +525,17 @@
     <div class="bg-white shadow-lg rounded-lg p-6 max-w-md w-full">
         <h3 class="text-xl font-bold text-gray-900 mb-4">{venue.name}</h3>
         <div class="space-y-2 text-gray-700">
+          <p><span class="font-semibold">Venue ID (only share with trusted users):</span></p> {#if showVenueId} 
+            <p>{venue.id}</p>
+        {:else}
+            
+            <p><button 
+                class="ml-2 text-blue-600 underline hover:text-blue-800 transition"
+                onclick={() => showVenueId = true}
+            >
+                Click to reveal
+            </button></p>
+        {/if}
           <p><span class="font-semibold">Address:</span> {venue.address}</p>
           <p><span class="font-semibold">Phone:</span> {venue.phone}</p>
           <p><span class="font-semibold">Website:</span> <a target="_blank" href="{venue.website}" class="text-blue-600 hover:underline">{venue.website}</a></p>
