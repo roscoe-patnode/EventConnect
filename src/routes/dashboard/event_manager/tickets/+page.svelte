@@ -3,6 +3,9 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   
+  let loading = $state(true);
+  let userRole = $state("");
+
   let showCreateForm = $state(false);
   let events: any = $state([]);
   // Variables for edit functionality
@@ -19,29 +22,23 @@
   let venueWebsite = '';
   let eventDate = '';
 
-  async function fetchEvents() {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
 
-      const { data, error } = await supabase
-          .from('events')
-          .select('*')
-          .eq('user_id', user.id);
-
-      if (error) throw error;
-      events = data;
-    } catch (error) {
-      console.error('Error fetching events:', error);
+  async function fetchRole() {
+        const { data: userData } = await supabase.auth.getUser();
+        const { data: userRoleData, error } = await supabase
+            .from("Profiles")
+            .select("role")
+            .eq("id", userData.user!.id);
+        if (error) throw error;
+            userRole = userRoleData[0].role;
     }
-  }
-
   onMount(async () => {
     // Load events for event creation
-    await fetchEvents();
     // Also load my submitted tickets
     await getCurrentUser();
     await fetchMyTickets();
+    await fetchRole();
+    loading = false;
   });
   
   async function handleCreateEvent(e: SubmitEvent) {
@@ -206,8 +203,19 @@
     return 'transparent';
   }
 </script>
-
+<!-- Check if User has the Permissions to view page -->
+{#if userRole !== 'event_manager' && !loading}
+<div class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
+    <div class="fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-6">
+        <div class="bg-white rounded-2xl shadow-xl p-6 max-w-md text-center">
+            <h2 class="text-2xl font-semibold text-gray-800">Access Denied</h2>
+            <p class="text-gray-600 mt-2">You do not have permission to view this page.</p>
+        </div>
+    </div>
+</div>
+{:else}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    
   <!-- Submit a Request Button -->
   <div class="flex justify-center items-center space-x-4 mt-8 mb-4">
     <h1 class="text-3xl font-bold text-gray-900">Service Request Tickets</h1>
@@ -270,3 +278,4 @@
     </div>
   {/if}
 </div>
+{/if}
