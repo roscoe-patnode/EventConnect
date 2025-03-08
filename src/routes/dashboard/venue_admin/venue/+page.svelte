@@ -45,14 +45,14 @@
         totalSpace = 0;
         services:string[] = [];
 
-        constructor(id:string, name:string, address:string, phone:string, website:string, totalSpace:number, services:string[]) {
+        constructor(id:string, name:string, address:string, phone:string, website:string, totalSpace:number, services:string[] = []) {
             this.id = id;
             this.name = name;
             this.address = address;
             this.phone = phone;
             this.website = website;
             this.totalSpace = totalSpace;
-            this.services = services;
+            this.services = services ?? [];
         }
     }
 
@@ -617,7 +617,7 @@
                         {#each suggestedService as service}
                             <option value={service}>{service}</option>
                         {/each}
-                            <option value="other">other</option>
+                            <option value="other">Other</option>
                         </select>
                     </div>
                     {#if serviceName === "other"}
