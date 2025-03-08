@@ -3,10 +3,6 @@
     import { supabase } from "$lib/supabaseClient";
     import { onMount } from 'svelte';
 
-    // Variables used to check User Role
-    let loading = $state(true);
-    let userRole = $state("");
-
     // Create and event vars
     let showCreateEventForm = $state(false);
 
@@ -147,8 +143,7 @@
             // Get Events and add event to array
             const { data, error } = await supabase
                 .from('Events')
-                .select('*')
-                .eq('venue_id', venues[0].id);
+                .select('*');
 
             if (error) throw error;
             for (const row of data) {
@@ -195,21 +190,11 @@
         }
 
     }
-    async function fetchRole() {
-        const { data: userData } = await supabase.auth.getUser();
-        const { data: userRoleData, error } = await supabase
-            .from("Profiles")
-            .select("role")
-            .eq("id", userData.user!.id);
-        if (error) throw error;
-            userRole = userRoleData[0].role;
-    }
+
     onMount(async () => {// Loading the database info from supabase
         await fetchVenues();
         await fetchVenueEventSpaces();
         await fetchEvents();
-        await fetchRole();
-        loading = false;
     });
     
     async function handleCreateEvent(e: SubmitEvent) {
@@ -411,9 +396,25 @@
     }
 
     // Function to open the invite modal
-    function inviteCollaborator(event: any) {
-        currentInviteEvent = { ...event };
-        showInviteForm = true;
+    async function inviteCollaborator(event: any) {
+    // Function to fetch event ID and copy it to clipboard
+    const { data, error } = await supabase
+      .from('Events')
+      .select('id')
+      .limit(1)
+      .single();
+
+    if (error) {
+      console.error('Error fetching event ID:', error);
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(data.id);
+      alert(`Event ID copied to clipboard!\nPlease send to the event manager you wish to add`); // copying to clipboard
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
     }
 
     // Function to close the invite modal
@@ -537,17 +538,7 @@
     }
 
 </script>
-<!-- Check if User has the Permissions to view page -->
-{#if userRole !== 'venue_admin' && !loading}
-<div class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
-    <div class="fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-6">
-        <div class="bg-white rounded-2xl shadow-xl p-6 max-w-md text-center">
-            <h2 class="text-2xl font-semibold text-gray-800">Access Denied</h2>
-            <p class="text-gray-600 mt-2">You do not have permission to view this page.</p>
-        </div>
-    </div>
-</div>
-{:else}
+
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="flex justify-between items-center mb-8">
         <h1 class="text-3xl font-bold text-gray-900">Events</h1>
@@ -920,4 +911,3 @@
         {/if}
     </div>
 </div>
-{/if}
