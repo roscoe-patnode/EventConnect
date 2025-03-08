@@ -143,7 +143,8 @@
             // Get Events and add event to array
             const { data, error } = await supabase
                 .from('Events')
-                .select('*');
+                .select('*')
+                .eq('venue_id', venues[0].id);
 
             if (error) throw error;
             for (const row of data) {
