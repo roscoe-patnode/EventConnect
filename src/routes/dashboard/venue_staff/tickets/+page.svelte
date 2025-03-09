@@ -339,21 +339,21 @@
           <div>
             {#if ticket.status === 'Pending'}
               <button 
-                onclick={() => takeTask(ticket.id)}
+                onclick={() => { takeTask(ticket.ticket_id); }}
                 class="mt-4 w-full px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors"
               >
                 Take Task
               </button>
             {:else if ticket.status === 'In Progress'}
               <button 
-                onclick={() => markAsCompleted(ticket.id)}
+                onclick={() => markAsCompleted(ticket.ticket_id)}
                 class="mt-4 w-full px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors"
               >
                 Mark as Completed
               </button>
             {:else if ticket.status === 'Completed'}
               <button 
-                onclick={() => reopenTicket(ticket.id)}
+                onclick={() => reopenTicket(ticket.ticket_id)}
                 class="mt-4 w-full px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition-colors"
               >
                 Re-open Ticket
