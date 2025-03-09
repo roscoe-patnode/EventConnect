@@ -616,6 +616,7 @@
 
                     <div>
                         <label for="eventSpaceId" class="block text-sm font-medium text-gray-700">Event Space</label>
+                        {#if allEventSpaces.size < 1} <p class="mt-2 text-sm text-gray-500 italic">No Event Spaces found</p> {/if}
                         <select
                             id="eventSpaceId"
                             bind:value={eventEventSpaceId}
@@ -629,7 +630,8 @@
                     </div>
                     {#if eventEventSpaceId}
                     <div>
-                        <label for="spaceSetup" class="block text-sm font-medium text-gray-700">Event Space</label>
+                        <label for="spaceSetup" class="block text-sm font-medium text-gray-700">Event Space Setup</label>
+                        {#if allEventSpaces.get(eventEventSpaceId).spaceSetups.size < 1} <p class="mt-2 text-sm text-gray-500 italic">No Setups found for this Event Space</p> {/if}
                         <select
                             id="spaceSetup"
                             bind:value={eventSpaceSetup}
@@ -729,6 +731,7 @@
                     {#if currentEvent.bookedSpaces[0]}
                     <div>
                         <label for="editEventSpace" class="block text-sm font-medium text-gray-700">Event Space</label>
+                        {#if allEventSpaces.size < 1} <p class="mt-2 text-sm text-gray-500 italic">No Event Spaces found</p> {/if}
                         <select
                             id="editEventSpace"
                             bind:value={currentEvent.bookedSpaces[0]}
@@ -742,7 +745,8 @@
                     </div>
                     
                     <div>
-                        <label for="editSpaceSetup" class="block text-sm font-medium text-gray-700">Event Space</label>
+                        <label for="editSpaceSetup" class="block text-sm font-medium text-gray-700">Event Space Setup</label>
+                        {#if allEventSpaces.get(eventEventSpaceId).spaceSetups.size < 1} <p class="mt-2 text-sm text-gray-500 italic">No Setups found for this Event Space</p> {/if}
                         <select
                             id="editSpaceSetup"
                             bind:value={currentEvent.bookedSpaces[0].currentSetup}
@@ -757,6 +761,7 @@
                     {:else}
                     <div>
                         <label for="eventSpaceId" class="block text-sm font-medium text-gray-700">Event Space</label>
+                        {#if allEventSpaces.size < 1} <p class="mt-2 text-sm text-gray-500 italic">No Event Spaces found</p> {/if}
                         <select
                             id="eventSpaceId"
                             bind:value={eventEventSpaceId}
@@ -770,7 +775,8 @@
                     </div>
                     {#if eventEventSpaceId}
                     <div>
-                        <label for="spaceSetup" class="block text-sm font-medium text-gray-700">Event Space</label>
+                        <label for="spaceSetup" class="block text-sm font-medium text-gray-700">Event Space Setup</label>
+                        {#if allEventSpaces.get(eventEventSpaceId).spaceSetups.size < 1} <p class="mt-2 text-sm text-gray-500 italic">No Setups found for this Event Space</p> {/if}
                         <select
                             id="spaceSetup"
                             bind:value={eventSpaceSetup}
