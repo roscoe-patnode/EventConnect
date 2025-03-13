@@ -70,7 +70,7 @@
         venue_admin: [
             { href: "/dashboard/venue_admin/venue", label: "My Venue" },
             { href: "/dashboard/venue_admin/events", label: "My Events" },
-            // { href: "/dashboard/venue_admin/calendar", label: "Calendar" },
+            { href: "/dashboard/venue_admin/calendar", label: "Calendar" },
             // { href: "/dashboard/chat", label: "Chat" }
         ],
         venue_staff: [
