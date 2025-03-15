@@ -1,7 +1,7 @@
 <!-- +page.svelte -->
 <script lang="ts">
   import { onMount } from 'svelte';
-  import Calendar from './Calendar.svelte';
+  import Calendar from '$lib/components/Calendar.svelte';
   import { supabase } from '$lib/supabaseClient';
     
   // Types
@@ -14,7 +14,7 @@
     
   type Profile = {
     id: string;
-    user_type: string; // 'venue_admin', 'event_manager', or 'venue_staff'
+    role: string; // 'venue_admin', 'event_manager', or 'venue_staff'
     venue_admin_id?: string;
   };
     
@@ -40,41 +40,35 @@
       
       // Get user profile from Profiles table
       const { data: profileData, error: profileError } = await supabase
-          .from('Profiles') 
-          .select('*')
-          .eq('id', user.id)
-          .single();
+        .from('Profiles') 
+        .select('*')
+        .eq('id', user.id)
+        .single();
       
       if (profileError) {
-          console.error('Profile error:', profileError);
-          // If no profile exists, we'll create a default one for development purposes
-          currentUser = { id: user.id, user_type: 'venue_admin' };
-          return currentUser;
+        console.error('Profile error:', profileError);
+        error = 'Failed to load user profile';
+        return null;
       }
       
       if (!profileData) {
-          console.warn('Profile not found, using default');
-          // Create a default profile for development
-          currentUser = { id: user.id, user_type: 'venue_admin' };
-          return currentUser;
+        error = 'User profile not found';
+        return null;
+      }
+      
+      
+      // Check if the role field exists and handle different capitalization or formatting
+      // Use optional chaining and nullish coalescing for safety
+      const role = profileData.role?.toLowerCase?.() ?? '';
+      console.log('Normalized user type:', role);
+      
+      if (role !== 'venue_admin') {
+        console.warn('User is not a venue admin:', role);
+        error = 'Only venue admins can access this page';
+        return null;
       }
       
       currentUser = profileData;
-      
-      // Debug log to check what user_type value we're getting
-      console.log('User type from database:', profileData.user_type);
-      
-      // Check if the user_type field exists and handle different capitalization or formatting
-      // Use optional chaining and nullish coalescing for safety
-      const userType = profileData.user_type?.toLowerCase?.() ?? '';
-      console.log('Normalized user type:', userType);
-      
-      if (!userType.includes('admin') && userType !== 'venue_admin') {
-          console.warn('User is not a venue admin:', userType);
-          // For development purposes, we'll continue anyway
-          // throw new Error('Only venue admins can access this page');
-      }
-      
       return profileData;
 
     } catch (err) {
@@ -84,96 +78,95 @@
     }
   }
 
-    
   // Fetch venue associated with the venue admin
   async function fetchUserVenue(profile: Profile) {
     try {
       // First, let's try to find a venue for this user
       const { data: venueData, error: venueError } = await supabase
-          .from('Venues')
-          .select('*')
-          .eq('venue_admin_id', profile.id)
-          .single();
+        .from('Venues')
+        .select('*')
+        .eq('venue_admin_id', profile.id)
+        .single();
       
       if (venueError) {
-          console.log('No venue found for this user, fetching first available venue');
-          
-          // If that fails, get any venue
-          const { data: firstVenue, error: firstVenueError } = await supabase
-              .from('Venues')
-              .select('*')
-              .limit(1)
-              .single();
-          
-          if (firstVenueError) {
-              console.error('Failed to fetch any venue:', firstVenueError);
-              throw firstVenueError;
-          }
-          
-          if (!firstVenue) throw new Error('No venues found in the database');
-      
-          userVenue = firstVenue;
-          return firstVenue;
+        console.log('No venue found for this user, fetching first available venue');
+        
+        // If that fails, get any venue
+        const { data: firstVenue, error: firstVenueError } = await supabase
+          .from('Venues')
+          .select('*')
+          .limit(1)
+          .single();
+        
+        if (firstVenueError) {
+          console.error('Failed to fetch any venue:', firstVenueError);
+          throw firstVenueError;
+        }
+        
+        if (!firstVenue) throw new Error('No venues found in the database');
+    
+        userVenue = firstVenue;
+        return firstVenue;
       }
       
       if (!venueData) throw new Error('No venue found for this user');
       
       userVenue = venueData;
       return venueData;
-      
+
     } catch (err) {
-        console.error('Error fetching venue:', err);
-        error = err.message || 'Failed to load venue data';
-        return null;
+      console.error('Error fetching venue:', err);
+      error = err.message || 'Failed to load venue data';
+      return null;
     }
   }
     
-    // Fetch events for the venue
-    async function fetchVenueEvents(venue: Venue) {
-      try {
-        const { data: eventData, error: eventError } = await supabase
-            .from('Events')  
-            .select('*')
-            .eq('venue_id', venue.id)
-            .order('title', { ascending: true }) 
-        
-        if (eventError) throw eventError;
-        
-        // Transform the data to match the expected format in Calendar.svelte
-        const transformedEvents = eventData?.map(event => ({
-          id: event.id,
-          name: event.title, // Map 'title' from DB to 'name' for Calendar component
-          dates: event.dates,
-          venue_id: event.venue_id
-        })) || [];
-        
-        events = transformedEvents;
-        console.log(`Loaded ${events.length} events for venue ${venue.id}`);
+  // Fetch events for the venue
+  async function fetchVenueEvents(venue: Venue) {
+    try {
+      const { data: eventData, error: eventError } = await supabase
+        .from('Events')  
+        .select('*')
+        .eq('venue_id', venue.id)
+        .order('title', { ascending: true }) 
+      
+      if (eventError) throw eventError;
+      
+      // Transform the data to match the expected format in Calendar.svelte
+      const transformedEvents = eventData?.map(event => ({
+        id: event.id,
+        name: event.title, // Map 'title' from DB to 'name' for Calendar component
+        dates: event.dates,
+        venue_id: event.venue_id
+      })) || [];
+      
+      events = transformedEvents;
+      console.log(`Loaded ${events.length} events for venue ${venue.id}`);
 
-      } catch (err) {
-        console.error('Error fetching events:', err);
-        error = err.message || 'Failed to load event data';
-      }
+    } catch (err) {
+      console.error('Error fetching events:', err);
+      error = err.message || 'Failed to load event data';
     }
+  }
     
-    // Load all data on component mount
-    onMount(async () => {
-      try {
-        const profile = await fetchUserProfile();
-        if (!profile) return;
-        
-        const venue = await fetchUserVenue(profile);
-        if (!venue) return;
-        
-        await fetchVenueEvents(venue);
-        
-        isLoading = false;
-      } catch (err) {
-        console.error('Error in data loading chain:', err);
-        error = err.message || 'An unexpected error occurred';
-        isLoading = false;
-      }
-    });
+  // Load all data on component mount
+  onMount(async () => {
+    try {
+      const profile = await fetchUserProfile();
+      if (!profile) return;
+      
+      const venue = await fetchUserVenue(profile);
+      if (!venue) return;
+      
+      await fetchVenueEvents(venue);
+      
+      isLoading = false;
+    } catch (err) {
+      console.error('Error in data loading chain:', err);
+      error = err.message || 'An unexpected error occurred';
+      isLoading = false;
+    }
+  });
 </script>
   
 <div class="calendar-page">
